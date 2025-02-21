@@ -1,0 +1,80 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # The main Spring Boot application service
+  stockflow-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stockflow-api
+    ports:
+      - "8080:8080"  # Maps the API port to your local machine
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev  # Activates development profile
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stockflow-db:5432/stockflow
+      - SPRING_DATASOURCE_USERNAME=stockflow_user
+      - SPRING_DATASOURCE_PASSWORD=stockflow_password
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate  # Validates schema instead of creating/updating
+      - SPRING_JPA_SHOW_SQL=true  # Shows SQL queries in logs for development
+    depends_on:
+      stockflow-db:
+        condition: service_healthy  # Ensures database is ready before starting API
+    networks:
+      - stockflow-network
+    volumes:
+      - ./logs:/app/logs  # Persists application logs
+    restart: unless-stopped  # Automatically restarts if the container stops
+
+  # PostgreSQL database service
+  stockflow-db:
+    image: postgres:15-alpine  # Using Alpine for a smaller image size
+    container_name: stockflow-db
+    environment:
+      - POSTGRES_DB=stockflow
+      - POSTGRES_USER=stockflow_user
+      - POSTGRES_PASSWORD=stockflow_password
+      # Optimized PostgreSQL settings for development
+      - POSTGRES_MAX_CONNECTIONS=50
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"  # Maps database port for external tools access
+    volumes:
+      - stockflow-data:/var/lib/postgresql/data  # Persists database data
+      - ./init-scripts:/docker-entrypoint-initdb.d  # Optional initialization scripts
+    networks:
+      - stockflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockflow_user -d stockflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # pgAdmin for database management (optional, development only)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: stockflow-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@stockflow.com
+      - PGADMIN_DEFAULT_PASSWORD=admin_password
+    ports:
+      - "5050:80"  # Access pgAdmin through browser at localhost:5050
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin  # Persists pgAdmin settings
+    networks:
+      - stockflow-network
+    depends_on:
+      - stockflow-db
+    restart: unless-stopped
+
+networks:
+  stockflow-network:
+    name: stockflow-network
+    driver: bridge
+
+volumes:
+  stockflow-data:
+    name: stockflow-data
+  pgadmin-data:
+    name: pgadmin-data
