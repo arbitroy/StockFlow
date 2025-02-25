@@ -1,33 +1,58 @@
-import Versions from './components/Versions'
-import electronLogo from './assets/electron.svg'
+import './assets/main.css'
+import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
+import MainLayout from './layouts/MainLayout'
+import Dashboard from './pages/Dashboard'
+import Inventory from './pages/Inventory'
+import Movements from './pages/Movements'
+import NotFound from './pages/NotFound'
+import Locations from './pages/Locations'
+import Reports from './pages/Reports'
+import Sales from './pages/Sales'
+
+// Create router configuration with all routes
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <MainLayout />,
+    children: [
+      {
+        path: '/',
+        element: <Dashboard />
+      },
+      {
+        path: '/inventory',
+        element: <Inventory />
+      },
+      {
+        path: '/movements',
+        element: <Movements />
+      },
+      {
+        path: '/locations',
+        element: <Locations />
+      },
+      {
+        path: '/reports',
+        element: <Reports />
+      },
+      {
+        path: '/sales',
+        element: <Sales />
+      },
+      {
+        path: '*',
+        element: <NotFound />
+      }
+    ]
+  }
+])
 
 function App(): JSX.Element {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
-
   return (
     <>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        Build an Electron app with <span className="react">React</span>
-        &nbsp;and <span className="ts">TypeScript</span>
-      </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
-      </div>
-      <Versions></Versions>
+      <RouterProvider router={router} />
+      <Toaster />
     </>
   )
 }

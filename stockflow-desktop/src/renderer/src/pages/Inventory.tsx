@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { StockItemDTO } from '@shared/types'
+import { StockItemDTO } from '../shared/types'
 import stockService from '../services/api/stockService'
 import notifyService from '../services/notification'
 import { PageHeader } from '../components/ui/PageHeader'
 import StockItemDialog from '../components/inventory/StockItemDialog'
 import { StockItemsTable } from '../components/inventory/StockItemsTable'
 
-const Inventory = () => {
+const Inventory = (): JSX.Element => {
   const [stockItems, setStockItems] = useState<StockItemDTO[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isError, setIsError] = useState(false)
@@ -18,7 +17,7 @@ const Inventory = () => {
 
   // Load stock items
   useEffect(() => {
-    const loadStockItems = async () => {
+    const loadStockItems = async (): Promise<void> => {
       try {
         setIsLoading(true)
         setIsError(false)
@@ -48,7 +47,7 @@ const Inventory = () => {
   })
 
   // Handle creating or updating a stock item
-  const handleSaveStockItem = async (item: StockItemDTO) => {
+  const handleSaveStockItem = async (item: StockItemDTO): Promise<boolean> => {
     try {
       setIsLoading(true)
 
@@ -78,7 +77,7 @@ const Inventory = () => {
   }
 
   // Handle deleting a stock item
-  const handleDeleteItem = async (id: string) => {
+  const handleDeleteItem = async (id: string): Promise<void> => {
     try {
       await stockService.deleteStockItem(id)
       setStockItems((prevItems) => prevItems.filter((item) => item.id !== id))
@@ -90,7 +89,11 @@ const Inventory = () => {
   }
 
   // Handle stock movement
-  const handleStockMovement = async (item: StockItemDTO, type: 'IN' | 'OUT', quantity: number) => {
+  const handleStockMovement = async (
+    item: StockItemDTO,
+    type: 'IN' | 'OUT',
+    quantity: number
+  ): Promise<void> => {
     try {
       await stockService.recordMovement({
         stockItemId: item.id!,
@@ -112,7 +115,7 @@ const Inventory = () => {
   }
 
   // Handle refresh
-  const handleRefresh = async () => {
+  const handleRefresh = async (): Promise<void> => {
     try {
       setIsLoading(true)
       const data = await stockService.getAllStockItems()
