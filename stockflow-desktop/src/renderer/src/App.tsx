@@ -8,8 +8,10 @@ import Movements from './pages/Movements'
 import Locations from './pages/Locations'
 import Reports from './pages/Reports'
 import Sales from './pages/Sales'
+import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
 import notifyService from './services/notification'
+import { checkApiConnection } from './services/api/config'
 
 // Create router configuration with all routes
 // Using HashRouter (createHashRouter) instead of BrowserRouter for Electron compatibility
@@ -43,6 +45,10 @@ const router = createHashRouter([
         element: <Sales />
       },
       {
+        path: 'settings',
+        element: <Settings />
+      },
+      {
         path: '*',
         element: <NotFound />
       }
@@ -56,6 +62,19 @@ function App(): JSX.Element {
     setTimeout(() => {
       notifyService.info('Welcome to StockFlow Inventory Management')
     }, 500)
+
+    // Check API connection on startup
+    checkApiConnection()
+      .then((isConnected) => {
+        if (isConnected) {
+          notifyService.success('Connected to StockFlow API')
+        } else {
+          notifyService.warning('Could not connect to StockFlow API. Working in offline mode.')
+        }
+      })
+      .catch(() => {
+        notifyService.warning('Could not connect to StockFlow API. Working in offline mode.')
+      })
   }, [])
 
   return (

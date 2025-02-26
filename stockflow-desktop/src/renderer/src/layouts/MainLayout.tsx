@@ -4,10 +4,15 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from '../components/navigation/Sidebar'
 import Header from '../components/navigation/Header'
 import ConnectionStatus from '../components/ui/ConnectionStatus'
+import { useConnectionStore, offlineStorage } from '../services/api/config'
+import syncService from '../services/syncService'
+import settingsService from '../services/settingsService'
 
 const MainLayout = (): JSX.Element => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-  const [isConnected, setIsConnected] = useState(true)
+
+  // Get connection state from our store
+  const { isConnected, checkConnection } = useConnectionStore()
 
   // Effect to handle sidebar state based on screen size
   useEffect(() => {
@@ -31,18 +36,54 @@ const MainLayout = (): JSX.Element => {
     }
   }, [])
 
-  // Effect to simulate connection checks (in a real app, this would check the API)
+  // Effect to initialize connection checks and offline sync
   useEffect(() => {
-    const checkConnection = (): void => {
-      // Simulate connection status (90% chance of being connected)
-      setIsConnected(Math.random() > 0.1)
+    // Load settings
+    const settings = settingsService.getSettings()
+    let connectionInterval: NodeJS.Timeout | undefined
+
+    // Use offline mode if configured
+    if (settings.offlineMode) {
+      useConnectionStore.setState({ isConnected: false })
+    } else {
+      // Initial connection check
+      checkConnection()
+
+      // Check connection status based on the configured sync interval
+      connectionInterval = setInterval(
+        () => {
+          checkConnection()
+        },
+        Math.max(5000, settings.syncInterval / 2)
+      ) // At least every 5 seconds or half the sync interval
     }
 
-    // Check connection every 30 seconds
-    const interval = setInterval(checkConnection, 30000)
+    // Start background sync service with configured interval
+    const stopSync = syncService.startBackgroundSync(
+      settings.autoSync ? settings.syncInterval : undefined
+    )
 
-    return (): void => clearInterval(interval)
-  }, [])
+    // Initialize offline storage
+    if (offlineStorage.hasOfflineData('stock_items') === false) {
+      offlineStorage.saveData('stock_items', [])
+    }
+
+    // Clean up intervals on unmount
+    return (): void => {
+      if (!settings.offlineMode && connectionInterval) {
+        clearInterval(connectionInterval)
+      }
+      stopSync()
+    }
+  }, [checkConnection])
+
+  // Effect to handle reconnection
+  useEffect(() => {
+    if (isConnected && syncService.offlineQueue.length > 0) {
+      // When connection is restored and we have offline actions, process them
+      syncService.processQueue()
+    }
+  }, [isConnected])
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -52,7 +93,10 @@ const MainLayout = (): JSX.Element => {
       {/* Main content */}
       <div className="flex flex-col flex-1 overflow-x-hidden">
         {/* Connection status bar */}
-        <ConnectionStatus isConnected={isConnected} />
+        <ConnectionStatus
+          isConnected={isConnected}
+          offlineCount={syncService.offlineQueue.length}
+        />
 
         {/* Header */}
         <Header

@@ -131,7 +131,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }: HeaderProps): JSX.Element => {
                   onClick={(e) => {
                     e.preventDefault()
                     setIsDropdownOpen(false)
-                    notifyService.info('Settings would open here')
+                    navigate('/settings')
                   }}
                 >
                   Settings

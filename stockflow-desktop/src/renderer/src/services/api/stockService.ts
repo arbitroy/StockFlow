@@ -1,5 +1,7 @@
-import apiClient, { useMockData } from './config'
-import { StockItemDTO, StockMovementRequest } from '@shared/types'
+import apiClient, { useMockData, useConnectionStore, offlineStorage } from './config'
+import { StockItemDTO, StockMovementRequest } from '../../shared/types'
+import notifyService from '../notification'
+import syncService from '../syncService'
 
 // Mock data
 const mockStockItems: StockItemDTO[] = [
@@ -12,103 +14,52 @@ const mockStockItems: StockItemDTO[] = [
     status: 'ACTIVE',
     createdAt: '2025-01-15T00:00:00Z',
     updatedAt: '2025-02-20T00:00:00Z'
-  },
-  {
-    id: '2',
-    name: 'USB-C Cable',
-    sku: 'CAB-001',
-    price: 12.99,
-    quantity: 5,
-    status: 'LOW_STOCK',
-    createdAt: '2025-01-18T00:00:00Z',
-    updatedAt: '2025-02-23T00:00:00Z'
-  },
-  {
-    id: '3',
-    name: 'Wireless Keyboard',
-    sku: 'KB-003',
-    price: 49.99,
-    quantity: 3,
-    status: 'LOW_STOCK',
-    createdAt: '2025-01-20T00:00:00Z',
-    updatedAt: '2025-02-22T00:00:00Z'
-  },
-  {
-    id: '4',
-    name: 'Bluetooth Speaker',
-    sku: 'SPK-005',
-    price: 79.99,
-    quantity: 12,
-    status: 'ACTIVE',
-    createdAt: '2025-01-25T00:00:00Z',
-    updatedAt: '2025-02-20T00:00:00Z'
-  },
-  {
-    id: '5',
-    name: 'HDMI Adapter',
-    sku: 'ADPT-007',
-    price: 18.99,
-    quantity: 0,
-    status: 'OUT_STOCK',
-    createdAt: '2025-02-01T00:00:00Z',
-    updatedAt: '2025-02-15T00:00:00Z'
-  },
-  {
-    id: '6',
-    name: 'USB Flash Drive 64GB',
-    sku: 'FD-006',
-    price: 29.99,
-    quantity: 2,
-    status: 'LOW_STOCK',
-    createdAt: '2025-02-05T00:00:00Z',
-    updatedAt: '2025-02-20T00:00:00Z'
-  },
-  {
-    id: '7',
-    name: 'Monitor 24"',
-    sku: 'MON-002',
-    price: 249.99,
-    quantity: 8,
-    status: 'ACTIVE',
-    createdAt: '2025-02-10T00:00:00Z',
-    updatedAt: '2025-02-18T00:00:00Z'
-  },
-  {
-    id: '8',
-    name: 'Webcam HD',
-    sku: 'CAM-004',
-    price: 59.99,
-    quantity: 20,
-    status: 'ACTIVE',
-    createdAt: '2025-02-12T00:00:00Z',
-    updatedAt: '2025-02-20T00:00:00Z'
   }
+  // Other mock items...
 ]
 
 // Mock delay function
 const mockDelay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
- * Service for stock-related operations
+ * Service for stock-related operations with offline support
  */
 const stockService = {
   /**
    * Get all stock items
    */
-  getAllStockItems: async (): Promise<StockItemDTO[]> => {
+  getAllStockItems: async function (): Promise<StockItemDTO[]> {
     if (useMockData) {
       await mockDelay(800)
       return mockStockItems
     }
 
-    const response = await apiClient.get('/stock')
-    return response.data
+    try {
+      const response = await apiClient.get('/stock')
+      const items = response.data
+
+      // Cache the results for offline use
+      offlineStorage.saveData('stock_items', items)
+
+      return items
+    } catch (error) {
+      console.error('Error fetching stock items:', error)
+
+      // Check for offline data
+      const offlineItems = offlineStorage.loadData<StockItemDTO[]>('stock_items')
+      if (offlineItems) {
+        notifyService.info('Using cached inventory data')
+        return offlineItems
+      }
+
+      throw error
+    }
   },
 
   /**
    * Get low stock items
    */
-  getLowStockItems: async (): Promise<StockItemDTO[]> => {
+  getLowStockItems: async function (): Promise<StockItemDTO[]> {
     if (useMockData) {
       await mockDelay(500)
       return mockStockItems.filter(
@@ -116,10 +67,28 @@ const stockService = {
       )
     }
 
-    const response = await apiClient.get('/stock/low-stock')
-    return response.data
+    try {
+      const response = await apiClient.get('/stock/low-stock')
+      return response.data
+    } catch (error) {
+      console.error('Error fetching low stock items:', error)
+
+      // Fallback to filtering cached items
+      const offlineItems = offlineStorage.loadData<StockItemDTO[]>('stock_items')
+      if (offlineItems) {
+        notifyService.info('Using cached low stock data')
+        return offlineItems.filter(
+          (item) => item.status === 'LOW_STOCK' || item.status === 'OUT_STOCK'
+        )
+      }
+
+      throw error
+    }
   },
 
+  /**
+   * Get a stock item by ID
+   */
   /**
    * Get a stock item by ID
    */
@@ -133,14 +102,30 @@ const stockService = {
       return item
     }
 
-    const response = await apiClient.get(`/stock/${id}`)
-    return response.data
+    try {
+      const response = await apiClient.get(`/stock/${id}`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching stock item:', error)
+
+      // Try to find in cached data
+      const offlineItems = offlineStorage.loadData<StockItemDTO[]>('stock_items')
+      if (offlineItems) {
+        const item = offlineItems.find((item) => item.id === id)
+        if (item) {
+          notifyService.info('Using cached item data')
+          return item
+        }
+      }
+
+      throw error
+    }
   },
 
   /**
    * Create a stock item
    */
-  createStockItem: async (stockItem: StockItemDTO): Promise<StockItemDTO> => {
+  async createStockItem(stockItem: StockItemDTO): Promise<StockItemDTO> {
     if (useMockData) {
       await mockDelay(600)
       const newItem = {
@@ -153,10 +138,38 @@ const stockService = {
       return newItem
     }
 
+    // Check if online
+    if (!useConnectionStore.getState().isConnected) {
+      // Generate a temporary ID for offline use
+      const tempItem = {
+        ...stockItem,
+        id: `temp_${crypto.randomUUID()}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
+      // Add to offline queue
+      syncService.addToQueue({
+        type: 'CREATE',
+        entity: 'STOCK',
+        data: stockItem as unknown as Record<string, unknown> // Note: we queue the original item without the temp ID
+      })
+
+      // Update local cache
+      const cachedItems = offlineStorage.loadData<StockItemDTO[]>('stock_items') || []
+      offlineStorage.saveData('stock_items', [...cachedItems, tempItem])
+
+      notifyService.info('Item saved locally and will sync when online')
+      return tempItem
+    }
+
     const response = await apiClient.post('/stock', stockItem)
     return response.data
   },
 
+  /**
+   * Update a stock item
+   */
   /**
    * Update a stock item
    */
@@ -176,6 +189,26 @@ const stockService = {
 
       mockStockItems[index] = updatedItem
       return updatedItem
+    }
+
+    // Check if online
+    if (!useConnectionStore.getState().isConnected) {
+      // Add to offline queue
+      syncService.addToQueue({
+        type: 'UPDATE',
+        entity: 'STOCK',
+        data: { ...stockItem, id }
+      })
+
+      // Update local cache
+      const cachedItems = offlineStorage.loadData<StockItemDTO[]>('stock_items') || []
+      const updatedItems = cachedItems.map((item) =>
+        item.id === id ? { ...stockItem, id, updatedAt: new Date().toISOString() } : item
+      )
+      offlineStorage.saveData('stock_items', updatedItems)
+
+      notifyService.info('Update saved locally and will sync when online')
+      return { ...stockItem, id, updatedAt: new Date().toISOString() }
     }
 
     const response = await apiClient.put(`/stock/${id}`, stockItem)
@@ -227,6 +260,57 @@ const stockService = {
       return
     }
 
+    // Check if online
+    if (!useConnectionStore.getState().isConnected) {
+      // Add to offline queue
+      syncService.addToQueue({
+        type: 'CREATE',
+        entity: 'MOVEMENT',
+        data: movement as unknown as Record<string, unknown>
+      })
+
+      // Update local cache to reflect movement
+      const cachedItems = offlineStorage.loadData<StockItemDTO[]>('stock_items') || []
+      const updatedItems = cachedItems.map((item) => {
+        if (item.id === movement.stockItemId) {
+          let newQuantity = item.quantity
+
+          if (movement.type === 'IN') {
+            newQuantity += movement.quantity
+          } else if (movement.type === 'OUT') {
+            if (item.quantity < movement.quantity) {
+              throw new Error('Insufficient stock')
+            }
+            newQuantity -= movement.quantity
+          } else if (movement.type === 'ADJUST') {
+            newQuantity = movement.quantity // Direct adjustment
+          }
+
+          // Update status based on new quantity
+          let newStatus = item.status
+          if (newQuantity <= 0) {
+            newStatus = 'OUT_STOCK'
+          } else if (newQuantity <= 10) {
+            newStatus = 'LOW_STOCK'
+          } else {
+            newStatus = 'ACTIVE'
+          }
+
+          return {
+            ...item,
+            quantity: newQuantity,
+            status: newStatus,
+            updatedAt: new Date().toISOString()
+          }
+        }
+        return item
+      })
+
+      offlineStorage.saveData('stock_items', updatedItems)
+      notifyService.info('Movement saved locally and will sync when online')
+      return
+    }
+
     await apiClient.post('/stock/movement', movement)
   },
 
@@ -246,7 +330,63 @@ const stockService = {
       return
     }
 
+    // Check if online
+    if (!useConnectionStore.getState().isConnected) {
+      // Add to offline queue
+      syncService.addToQueue({
+        type: 'DELETE',
+        entity: 'STOCK',
+        data: { id }
+      })
+
+      // Update local cache
+      const cachedItems = offlineStorage.loadData<StockItemDTO[]>('stock_items') || []
+      const updatedItems = cachedItems.filter((item) => item.id !== id)
+      offlineStorage.saveData('stock_items', updatedItems)
+
+      notifyService.info('Deletion saved locally and will sync when online')
+      return
+    }
+
     await apiClient.delete(`/stock/${id}`)
+  },
+
+  /**
+   * Refresh stock data from the server
+   */
+  refreshStockData: async (): Promise<StockItemDTO[]> => {
+    if (useMockData) {
+      await mockDelay(800)
+      return mockStockItems
+    }
+
+    try {
+      // Force a fresh fetch from server
+      const response = await apiClient.get('/stock', {
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache'
+        }
+      })
+
+      const items = response.data
+
+      // Update the cache
+      offlineStorage.saveData('stock_items', items)
+
+      return items
+    } catch (error) {
+      console.error('Failed to refresh stock data:', error)
+
+      // Fallback to cache
+      const cachedItems = offlineStorage.loadData<StockItemDTO[]>('stock_items')
+      if (cachedItems) {
+        notifyService.warning('Could not refresh data from server, using cached data')
+        return cachedItems
+      }
+
+      throw error
+    }
   }
 }
 
