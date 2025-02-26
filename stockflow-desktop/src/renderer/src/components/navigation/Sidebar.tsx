@@ -151,9 +151,9 @@ const Sidebar = ({ isOpen }: SidebarProps): JSX.Element => {
   useEffect(() => {
     const getVersion = async (): Promise<void> => {
       try {
-        if (window.api) {
-          const version = await window.api.app.getVersion()
-          setAppVersion(version)
+        if (window.electron?.process?.versions) {
+          // Use Electron version as fallback
+          setAppVersion(window.electron.process.versions.electron || '1.0.0')
         }
       } catch (error) {
         console.error('Failed to get app version:', error)
