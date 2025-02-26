@@ -29,9 +29,9 @@ const SaleDetailModal = ({ isOpen, onClose, sale }: SaleDetailModalProps): JSX.E
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-[50] overflow-y-auto">
       <motion.div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-[rgba(0,0,0,0.5)]transition-opacity"
         initial="hidden"
         animate="visible"
         exit="hidden"
@@ -892,7 +892,7 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <motion.div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-[rgba(0,0,0,0.5)] transition-opacity"
         initial="hidden"
         animate="visible"
         exit="hidden"
@@ -902,7 +902,7 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
 
       <div className="flex items-center justify-center min-h-screen p-4">
         <motion.div
-          className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-auto"
+          className="bg-white rounded-lg shadow-xl w-full z-100 max-w-3xl mx-auto"
           initial="hidden"
           animate="visible"
           exit="exit"
