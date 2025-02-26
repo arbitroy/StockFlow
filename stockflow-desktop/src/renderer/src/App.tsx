@@ -1,20 +1,22 @@
-import './assets/main.css'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { useEffect } from 'react'
+import { RouterProvider, createHashRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import MainLayout from './layouts/MainLayout'
 import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
 import Movements from './pages/Movements'
-import NotFound from './pages/NotFound'
 import Locations from './pages/Locations'
 import Reports from './pages/Reports'
 import Sales from './pages/Sales'
+import NotFound from './pages/NotFound'
+import notifyService from './services/notification'
 
 // Create router configuration with all routes
-const router = createBrowserRouter([
+// Using HashRouter (createHashRouter) instead of BrowserRouter for Electron compatibility
+const router = createHashRouter([
   {
     path: '/',
-    element: <MainLayout />,
+    element: <MainLayout>{null}</MainLayout>,
     children: [
       {
         path: '/',
@@ -49,10 +51,17 @@ const router = createBrowserRouter([
 ])
 
 function App(): JSX.Element {
+  // Show welcome notification on initial load
+  useEffect(() => {
+    setTimeout(() => {
+      notifyService.info('Welcome to StockFlow Inventory Management')
+    }, 500)
+  }, [])
+
   return (
     <>
       <RouterProvider router={router} />
-      <Toaster />
+      <Toaster position="top-right" />
     </>
   )
 }
