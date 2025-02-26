@@ -6,7 +6,7 @@ import notifyService from '../services/notification'
 
 type ReportType = 'stock' | 'movement' | 'sales'
 
-const Reports = () => {
+const Reports: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [activeReport, setActiveReport] = useState<ReportType>('stock')
   const [dateRange, setDateRange] = useState({

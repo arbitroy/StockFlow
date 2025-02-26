@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { StockItemDTO } from '@shared/types'
+import { StockItemDTO } from '../../shared/types'
 
 interface StockMovementDialogProps {
   item: StockItemDTO
@@ -70,102 +70,104 @@ const StockMovementDialog = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 overflow-y-auto">
-        <motion.div
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-          initial="hidden"
-          animate="visible"
-          exit="hidden"
-          variants={overlayVariants}
-          onClick={onClose}
-        />
-
-        <div className="flex items-center justify-center min-h-screen p-4">
+      {item && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
           <motion.div
-            className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto"
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
             initial="hidden"
             animate="visible"
-            exit="exit"
-            variants={dialogVariants}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-primary-dark">
-                {type === 'IN' ? 'Stock In' : 'Stock Out'}: {item.name}
-              </h3>
-            </div>
+            exit="hidden"
+            variants={overlayVariants}
+            onClick={onClose}
+          />
 
-            <div className="px-6 py-4">
-              <div className="mb-4">
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700">Current Stock:</span>
-                  <span className="text-sm text-gray-500">{item.quantity} units</span>
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <motion.div
+              className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={dialogVariants}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-primary-dark">
+                  {type === 'IN' ? 'Stock In' : 'Stock Out'}: {item.name}
+                </h3>
+              </div>
+
+              <div className="px-6 py-4">
+                <div className="mb-4">
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-medium text-gray-700">Current Stock:</span>
+                    <span className="text-sm text-gray-500">{item.quantity} units</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">SKU:</span>
+                    <span className="text-sm text-gray-500">{item.sku}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-700">SKU:</span>
-                  <span className="text-sm text-gray-500">{item.sku}</span>
+
+                <div className="mb-4">
+                  <label htmlFor="quantity" className="form-label">
+                    {type === 'IN' ? 'Add Quantity' : 'Remove Quantity'}
+                  </label>
+                  <input
+                    type="number"
+                    id="quantity"
+                    value={quantity}
+                    onChange={handleQuantityChange}
+                    min="1"
+                    max={type === 'OUT' ? item.quantity : undefined}
+                    className={`form-input ${error ? 'border-red-300' : ''}`}
+                  />
+                  {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+                </div>
+
+                <div className="mt-6 bg-gray-50 p-3 rounded-md">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">New Stock Level:</span>
+                    <span className="text-sm font-medium">
+                      {type === 'IN'
+                        ? item.quantity + quantity
+                        : Math.max(0, item.quantity - quantity)}{' '}
+                      units
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label htmlFor="quantity" className="form-label">
-                  {type === 'IN' ? 'Add Quantity' : 'Remove Quantity'}
-                </label>
-                <input
-                  type="number"
-                  id="quantity"
-                  value={quantity}
-                  onChange={handleQuantityChange}
-                  min="1"
-                  max={type === 'OUT' ? item.quantity : undefined}
-                  className={`form-input ${error ? 'border-red-300' : ''}`}
-                />
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="btn btn-outline"
+                  disabled={isProcessing}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={isProcessing || !!error}
+                  className={`btn ${type === 'IN' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white focus-visible:ring focus-visible:ring-opacity-50 ${type === 'IN' ? 'focus-visible:ring-green-300' : 'focus-visible:ring-red-300'}`}
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Confirm {type === 'IN' ? 'Stock In' : 'Stock Out'}</span>
+                    </>
+                  )}
+                </button>
               </div>
-
-              <div className="mt-6 bg-gray-50 p-3 rounded-md">
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium text-gray-700">New Stock Level:</span>
-                  <span className="text-sm font-medium">
-                    {type === 'IN'
-                      ? item.quantity + quantity
-                      : Math.max(0, item.quantity - quantity)}{' '}
-                    units
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-outline"
-                disabled={isProcessing}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={isProcessing || !!error}
-                className={`btn ${type === 'IN' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white focus-visible:ring focus-visible:ring-opacity-50 ${type === 'IN' ? 'focus-visible:ring-green-300' : 'focus-visible:ring-red-300'}`}
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Confirm {type === 'IN' ? 'Stock In' : 'Stock Out'}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </div>
-      </div>
+      )}
     </AnimatePresence>
   )
 }

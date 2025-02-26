@@ -16,30 +16,30 @@ import notifyService from './services/notification'
 const router = createHashRouter([
   {
     path: '/',
-    element: <MainLayout>{null}</MainLayout>,
+    element: <MainLayout />,
     children: [
       {
-        path: '/',
+        index: true,
         element: <Dashboard />
       },
       {
-        path: '/inventory',
+        path: 'inventory',
         element: <Inventory />
       },
       {
-        path: '/movements',
+        path: 'movements',
         element: <Movements />
       },
       {
-        path: '/locations',
+        path: 'locations',
         element: <Locations />
       },
       {
-        path: '/reports',
+        path: 'reports',
         element: <Reports />
       },
       {
-        path: '/sales',
+        path: 'sales',
         element: <Sales />
       },
       {

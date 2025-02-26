@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { StockItemDTO } from '@shared/types'
+import { StockItemDTO } from '../../shared/types'
 import StockMovementDialog from './StockMovementDialog'
 
 interface StockItemsTableProps {

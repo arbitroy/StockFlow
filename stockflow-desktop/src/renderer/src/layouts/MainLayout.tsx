@@ -1,14 +1,11 @@
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { Outlet } from 'react-router-dom'
 import Sidebar from '../components/navigation/Sidebar'
 import Header from '../components/navigation/Header'
 import ConnectionStatus from '../components/ui/ConnectionStatus'
 
-interface MainLayoutProps {
-  children: ReactNode
-}
-
-const MainLayout = ({ children }: MainLayoutProps): JSX.Element => {
+const MainLayout = (): JSX.Element => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isConnected, setIsConnected] = useState(true)
 
@@ -72,7 +69,7 @@ const MainLayout = ({ children }: MainLayoutProps): JSX.Element => {
             transition={{ duration: 0.2 }}
             className="container mx-auto"
           >
-            {children}
+            <Outlet />
           </motion.div>
         </main>
       </div>

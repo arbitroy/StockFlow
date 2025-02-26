@@ -5,10 +5,11 @@ import notifyService from '../services/notification'
 import { PageHeader } from '../components/ui/PageHeader'
 import stockService from '../services/api/stockService'
 import reportService from '../services/api/reportService'
-import { StockItemDTO } from '@shared/types'
+import { StockItemDTO } from '../shared/types'
+import PropTypes from 'prop-types'
 
 // Component for stat cards
-const StatCard = ({ title, value, icon, color, isLoading = false }) => {
+const StatCard = ({ title, value, icon, color, isLoading = false }): JSX.Element => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -31,7 +32,15 @@ const StatCard = ({ title, value, icon, color, isLoading = false }) => {
   )
 }
 
-const Dashboard = () => {
+StatCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  icon: PropTypes.element.isRequired,
+  color: PropTypes.string.isRequired,
+  isLoading: PropTypes.bool
+}
+
+const Dashboard = (): JSX.Element => {
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({
     totalItems: 0,
@@ -40,11 +49,20 @@ const Dashboard = () => {
     totalValue: 0
   })
   const [lowStockItems, setLowStockItems] = useState<StockItemDTO[]>([])
-  const [recentMovements, setRecentMovements] = useState([])
+  const [recentMovements, setRecentMovements] = useState<
+    {
+      itemName: string
+      sku: string
+      type: string
+      quantity: number
+      date: string
+      reference: string
+    }[]
+  >([])
 
   // Load dashboard data
   useEffect(() => {
-    const loadDashboardData = async () => {
+    const loadDashboardData = async (): Promise<void> => {
       try {
         setIsLoading(true)
 
@@ -90,7 +108,7 @@ const Dashboard = () => {
     loadDashboardData()
   }, [])
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (): Promise<void> => {
     try {
       setIsLoading(true)
       // Re-fetch all data
