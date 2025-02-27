@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,4 +38,10 @@ public interface StockLocationRepository extends JpaRepository<StockLocation, UU
         WHERE DATE(sl.updatedAt) <= :date
     """)
     Map<UUID, Map<UUID, Integer>> findOpeningStockForDate(@Param("date") LocalDate date);
+    
+    // Added methods for LocationService
+    List<StockLocation> findByLocationId(UUID locationId);
+    
+    @Query("SELECT COUNT(sl) FROM StockLocation sl WHERE sl.location.id = :locationId")
+    long countByLocationId(@Param("locationId") UUID locationId);
 }

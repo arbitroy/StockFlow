@@ -1,5 +1,5 @@
 import apiClient, { useMockData, offlineStorage } from './config'
-import { LocationDTO, StockItemDTO } from '../../shared/types'
+import { LocationDTO, StockItemDTO, StockStatus } from '../../shared/types'
 import notifyService from '../notification'
 
 // Mock data for locations
@@ -40,7 +40,7 @@ const mockInventoryData = {
         sku: 'MS-001',
         price: 24.99,
         quantity: 50,
-        status: 'ACTIVE',
+        status: 'ACTIVE' as StockStatus,
         createdAt: '2025-01-15T00:00:00Z',
         updatedAt: '2025-02-20T00:00:00Z'
       },
@@ -253,10 +253,20 @@ const locationService = {
   /**
    * Get inventory for a specific location
    */
-  getLocationInventory: async function (locationId: string): Promise<any[]> {
+  getLocationInventory: async function (
+    locationId: string
+  ): Promise<{ stockItem: StockItemDTO; quantity: number; locationId: string }[]> {
     if (useMockData) {
       await mockDelay(800)
-      return mockInventoryData[locationId as keyof typeof mockInventoryData] || []
+      return (
+        mockInventoryData[locationId as keyof typeof mockInventoryData].map((item) => ({
+          ...item,
+          stockItem: {
+            ...item.stockItem,
+            status: item.stockItem.status as StockStatus
+          }
+        })) || []
+      )
     }
 
     try {
@@ -266,7 +276,9 @@ const locationService = {
       console.error('Error fetching location inventory:', error)
 
       // Check for offline data
-      const offlineInventory = offlineStorage.loadData<any[]>(`inventory_${locationId}`)
+      const offlineInventory = offlineStorage.loadData<
+        { stockItem: StockItemDTO; quantity: number; locationId: string }[]
+      >(`inventory_${locationId}`)
       if (offlineInventory) {
         notifyService.info('Using cached inventory data')
         return offlineInventory

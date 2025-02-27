@@ -7,13 +7,35 @@ import syncService from '../syncService'
 const mockDelay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
- * Service for stock transfer operations with offline support
+    | { outMovement: Movement; inMovement: Movement }
  */
 const transferService = {
   /**
    * Transfer stock between locations
    */
-  transferStock: async (transferRequest: TransferRequest): Promise<any> => {
+  transferStock: async (
+    transferRequest: TransferRequest
+  ): Promise<
+    | {
+        outMovement: {
+          id: string
+          stockItemId: string
+          quantity: number
+          type: string
+          locationId: string
+          reference: string
+        }
+        inMovement: {
+          id: string
+          stockItemId: string
+          quantity: number
+          type: string
+          locationId: string
+          reference: string
+        }
+      }
+    | { offlineMode: boolean; pendingSync: boolean; timestamp: Date }
+  > => {
     if (useMockData) {
       await mockDelay(800)
 

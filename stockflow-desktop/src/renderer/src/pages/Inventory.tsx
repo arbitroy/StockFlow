@@ -17,7 +17,13 @@ const Inventory = (): JSX.Element => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<StockItemDTO | undefined>(undefined)
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
-  const [locations, setLocations] = useState<any[]>([
+  interface Location {
+    id: string
+    name: string
+    type: 'WAREHOUSE' | 'STORE'
+  }
+
+  const [locations] = useState<Location[]>([
     // Mock locations for now - would be fetched from API
     { id: '1', name: 'Main Warehouse', type: 'WAREHOUSE' },
     { id: '2', name: 'Downtown Store', type: 'STORE' },

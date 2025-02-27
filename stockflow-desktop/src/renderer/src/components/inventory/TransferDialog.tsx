@@ -175,7 +175,7 @@ const TransferDialog = ({
 
       <div className="flex items-center justify-center min-h-screen p-4">
         <motion.div
-          className="bg-white rounded-lg shadow-xl w-full max-w-md mx-auto"
+          className="bg-white rounded-lg shadow-xl w-full z-100 max-w-md mx-auto"
           initial="hidden"
           animate="visible"
           exit="exit"

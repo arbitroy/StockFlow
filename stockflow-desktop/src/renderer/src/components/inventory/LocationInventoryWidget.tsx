@@ -36,7 +36,12 @@ const mockInventorySummaries = {
 const LocationInventoryWidget: React.FC = () => {
   const [locations, setLocations] = useState<LocationDTO[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [inventorySummaries, setInventorySummaries] = useState<Record<string, any>>({})
+  const [inventorySummaries, setInventorySummaries] = useState<
+    Record<
+      string,
+      { totalItems: number; totalQuantity: number; totalValue: number; lowStockItems: number }
+    >
+  >({})
 
   useEffect(() => {
     const loadData = async (): Promise<void> => {

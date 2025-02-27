@@ -35,8 +35,25 @@ const Transfers: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [stockItems, setStockItems] = useState<StockItemDTO[]>([])
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
-  const [transferHistory, setTransferHistory] = useState<any[]>([])
-  const [locations, setLocations] = useState<any[]>([
+  interface TransferHistoryItem {
+    id: string
+    date: string
+    stockItem: string
+    sourceLocation: string
+    targetLocation: string
+    quantity: number
+    reference: string
+    status: string
+  }
+
+  const [transferHistory, setTransferHistory] = useState<TransferHistoryItem[]>([])
+  interface Location {
+    id: string
+    name: string
+    type: 'WAREHOUSE' | 'STORE'
+  }
+
+  const [locations, setLocations] = useState<Location[]>([
     // Mock locations for now - would be fetched from API
     { id: '1', name: 'Main Warehouse', type: 'WAREHOUSE' },
     { id: '2', name: 'Downtown Store', type: 'STORE' },
