@@ -1,36 +1,10 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import { LocationDTO } from '../shared/types'
 import notifyService from '../services/notification'
-
-// Mock data for locations
-const mockLocations: LocationDTO[] = [
-  {
-    id: '1',
-    name: 'Main Warehouse',
-    type: 'WAREHOUSE',
-    createdAt: '2025-01-10T00:00:00Z'
-  },
-  {
-    id: '2',
-    name: 'Downtown Store',
-    type: 'STORE',
-    createdAt: '2025-01-15T00:00:00Z'
-  },
-  {
-    id: '3',
-    name: 'East Distribution Center',
-    type: 'WAREHOUSE',
-    createdAt: '2025-01-20T00:00:00Z'
-  },
-  {
-    id: '4',
-    name: 'North Retail',
-    type: 'STORE',
-    createdAt: '2025-02-01T00:00:00Z'
-  }
-]
+import locationService from '../services/api/locationService'
 
 interface LocationDialogProps {
   isOpen: boolean
@@ -223,6 +197,7 @@ const LocationDialog = ({
 }
 
 const Locations: React.FC = () => {
+  const navigate = useNavigate()
   const [locations, setLocations] = useState<LocationDTO[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -234,9 +209,9 @@ const Locations: React.FC = () => {
     const loadLocations = async (): Promise<void> => {
       setIsLoading(true)
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        setLocations(mockLocations)
+        // Get locations from the service instead of using mock data
+        const data = await locationService.getAllLocations()
+        setLocations(data)
       } catch (error) {
         console.error('Failed to load locations:', error)
         notifyService.error('Failed to load locations')
@@ -260,20 +235,17 @@ const Locations: React.FC = () => {
 
   const handleSaveLocation = async (location: LocationDTO): Promise<void> => {
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
+      // Update using the service
       if (location.id) {
         // Edit existing location
-        setLocations((prev) => prev.map((item) => (item.id === location.id ? location : item)))
+        const updatedLocation = await locationService.updateLocation(location.id, location)
+        setLocations((prev) =>
+          prev.map((item) => (item.id === location.id ? updatedLocation : item))
+        )
         notifyService.success(`Location "${location.name}" updated successfully`)
       } else {
         // Add new location
-        const newLocation = {
-          ...location,
-          id: Math.random().toString(36).substring(2, 9),
-          createdAt: new Date().toISOString()
-        }
+        const newLocation = await locationService.createLocation(location)
         setLocations((prev) => [...prev, newLocation])
         notifyService.success(`Location "${location.name}" added successfully`)
       }
@@ -285,12 +257,9 @@ const Locations: React.FC = () => {
 
   const handleDeleteLocation = async (id: string): Promise<void> => {
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 600))
-
+      await locationService.deleteLocation(id)
       setLocations((prev) => prev.filter((item) => item.id !== id))
       notifyService.success('Location deleted successfully')
-
       setDeleteConfirmId(null)
     } catch (error) {
       console.error('Failed to delete location:', error)
@@ -476,9 +445,7 @@ const Locations: React.FC = () => {
               <div className="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-between">
                 <button
                   className="text-sm text-primary font-medium hover:text-primary-dark"
-                  onClick={() => {
-                    notifyService.info(`Opening inventory for ${location.name}`)
-                  }}
+                  onClick={() => navigate(`/locations/${location.id}/inventory`)}
                 >
                   View Inventory
                 </button>

@@ -1,13 +1,14 @@
 import { useConnectionStore, offlineStorage } from './api/config'
 import notifyService from './notification'
 import stockService from './api/stockService'
-import { MovementType, StockItemDTO } from '@renderer/shared/types'
+import transferService from './api/transferService'
+import { MovementType, StockItemDTO, TransferRequest } from '@renderer/shared/types'
 
 // Types for offline actions
 export type OfflineAction = {
   id: string
   type: 'CREATE' | 'UPDATE' | 'DELETE'
-  entity: 'STOCK' | 'SALE' | 'LOCATION' | 'MOVEMENT'
+  entity: 'STOCK' | 'SALE' | 'LOCATION' | 'MOVEMENT' | 'TRANSFER'
   data: Record<string, unknown>
   timestamp: number
 }
@@ -73,6 +74,9 @@ export const syncService = {
             break
           case 'MOVEMENT':
             await this.processMovementAction(action)
+            break
+          case 'TRANSFER':
+            await this.processTransferAction(action)
             break
         }
 
@@ -143,6 +147,15 @@ export const syncService = {
       await stockService.recordMovement(movementData)
     }
     // Other movement actions would be implemented similarly
+  },
+
+  // Process transfer-related actions
+  async processTransferAction(action: OfflineAction): Promise<void> {
+    if (action.type === 'CREATE') {
+      const transferData = action.data as unknown as TransferRequest
+      await transferService.processOfflineTransfer(transferData)
+    }
+    // Other transfer actions would be implemented similarly
   },
 
   // Start background sync process

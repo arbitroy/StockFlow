@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { StockItemDTO } from '../shared/types'
+import { StockItemDTO, TransferRequest } from '../shared/types'
 import stockService from '../services/api/stockService'
+import transferService from '../services/api/transferService'
 import notifyService from '../services/notification'
 import { PageHeader } from '../components/ui/PageHeader'
 import StockItemDialog from '../components/inventory/StockItemDialog'
 import { StockItemsTable } from '../components/inventory/StockItemsTable'
+import TransferDialog from '../components/inventory/TransferDialog'
 
 const Inventory = (): JSX.Element => {
   const [stockItems, setStockItems] = useState<StockItemDTO[]>([])
@@ -14,6 +16,14 @@ const Inventory = (): JSX.Element => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<StockItemDTO | undefined>(undefined)
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
+  const [locations, setLocations] = useState<any[]>([
+    // Mock locations for now - would be fetched from API
+    { id: '1', name: 'Main Warehouse', type: 'WAREHOUSE' },
+    { id: '2', name: 'Downtown Store', type: 'STORE' },
+    { id: '3', name: 'East Distribution Center', type: 'WAREHOUSE' },
+    { id: '4', name: 'North Retail', type: 'STORE' }
+  ])
 
   // Load stock items
   useEffect(() => {
@@ -129,6 +139,18 @@ const Inventory = (): JSX.Element => {
     }
   }
 
+  // Handle stock transfer
+  const handleTransfer = async (transferData: TransferRequest): Promise<void> => {
+    try {
+      await transferService.transferStock(transferData)
+      // Refresh stock items after successful transfer
+      await handleRefresh()
+    } catch (error) {
+      console.error('Failed to transfer stock:', error)
+      throw error
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -156,6 +178,24 @@ const Inventory = (): JSX.Element => {
                 />
               </svg>
               <span>Add Item</span>
+            </button>
+
+            <button className="btn btn-secondary" onClick={() => setTransferDialogOpen(true)}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                />
+              </svg>
+              <span>Transfer Stock</span>
             </button>
 
             <button className="btn btn-outline" onClick={handleRefresh} disabled={isLoading}>
@@ -251,6 +291,16 @@ const Inventory = (): JSX.Element => {
         onSave={handleSaveStockItem}
         initialData={editingItem}
         title={editingItem ? 'Edit Stock Item' : 'Add New Stock Item'}
+      />
+
+      {/* Transfer Stock Dialog */}
+      <TransferDialog
+        isOpen={transferDialogOpen}
+        onClose={() => setTransferDialogOpen(false)}
+        onConfirm={handleTransfer}
+        stockItems={stockItems.filter((item) => item.quantity > 0)}
+        locations={locations}
+        isLoading={isLoading}
       />
     </div>
   )

@@ -161,3 +161,22 @@ export interface AppSettings {
   lowStockThreshold: number
   notifications: boolean
 }
+
+// Request Types
+export interface StockMovementRequest {
+  stockItemId: string
+  quantity: number
+  type: MovementType
+  reference?: string
+  notes?: string
+  locationId?: string
+}
+
+export interface TransferRequest {
+  stockItemId: string
+  sourceLocationId: string
+  targetLocationId: string
+  quantity: number
+  reference?: string
+  notes?: string
+}

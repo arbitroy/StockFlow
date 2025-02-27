@@ -7,6 +7,7 @@ import stockService from '../services/api/stockService'
 import reportService from '../services/api/reportService'
 import { StockItemDTO } from '../shared/types'
 import PropTypes from 'prop-types'
+import LocationInventoryWidget from '../components/inventory/LocationInventoryWidget'
 
 // Component for stat cards
 const StatCard = ({ title, value, icon, color, isLoading = false }): JSX.Element => {
@@ -425,6 +426,9 @@ const Dashboard = (): JSX.Element => {
         </div>
       </div>
 
+      {/* Location Inventory Widget */}
+      <LocationInventoryWidget />
+
       {/* Quick Actions */}
       <div className="bg-surface rounded-lg shadow-card p-6">
         <h2 className="text-lg font-semibold text-primary-dark mb-4">Quick Actions</h2>
@@ -472,7 +476,7 @@ const Dashboard = (): JSX.Element => {
           </Link>
 
           <Link
-            to="/reports"
+            to="/transfers"
             className="btn btn-outline hover:bg-secondary-light hover:text-secondary-dark hover:border-secondary-light justify-center py-4"
           >
             <svg
@@ -486,10 +490,10 @@ const Dashboard = (): JSX.Element => {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
               />
             </svg>
-            <span>Generate Reports</span>
+            <span>Transfer Stock</span>
           </Link>
         </div>
       </div>

@@ -6,9 +6,11 @@ import Dashboard from './pages/Dashboard'
 import Inventory from './pages/Inventory'
 import Movements from './pages/Movements'
 import Locations from './pages/Locations'
+import LocationInventory from './pages/LocationInventory'
 import Reports from './pages/Reports'
 import Sales from './pages/Sales'
 import Settings from './pages/Settings'
+import Transfers from './pages/Transfers'
 import NotFound from './pages/NotFound'
 import notifyService from './services/notification'
 import { checkApiConnection } from './services/api/config'
@@ -35,6 +37,14 @@ const router = createHashRouter([
       {
         path: 'locations',
         element: <Locations />
+      },
+      {
+        path: 'locations/:locationId/inventory',
+        element: <LocationInventory />
+      },
+      {
+        path: 'transfers',
+        element: <Transfers />
       },
       {
         path: 'reports',
