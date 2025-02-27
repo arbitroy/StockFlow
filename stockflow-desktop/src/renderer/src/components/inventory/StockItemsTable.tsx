@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { StockItemDTO } from '../../shared/types'
 import StockMovementDialog from './StockMovementDialog'
+import AddToLocationDialog from './AddToLocationDialog'
 
 interface StockItemsTableProps {
   items: StockItemDTO[]
@@ -25,6 +26,8 @@ export const StockItemsTable = ({
     item: StockItemDTO
     type: 'IN' | 'OUT'
   } | null>(null)
+  // New state for Add to Location dialog
+  const [addToLocationItem, setAddToLocationItem] = useState<StockItemDTO | null>(null)
 
   // Handle confirm delete
   const handleConfirmDelete = async (id: string): Promise<void> => {
@@ -193,6 +196,33 @@ export const StockItemsTable = ({
                 />
               </svg>
             </button>
+            {/* Add new button for adding to location */}
+            <button
+              onClick={() => setAddToLocationItem(item)}
+              className="text-primary hover:text-primary-dark"
+              title="Add to Location"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+            </button>
             <button
               onClick={() => onEdit(item)}
               className="text-primary hover:text-primary-dark"
@@ -333,6 +363,11 @@ export const StockItemsTable = ({
           onClose={() => setMovementDialogItem(null)}
           onConfirm={handleMovementConfirm}
         />
+      )}
+
+      {/* Add to Location Dialog */}
+      {addToLocationItem && (
+        <AddToLocationDialog item={addToLocationItem} onClose={() => setAddToLocationItem(null)} />
       )}
     </>
   )
