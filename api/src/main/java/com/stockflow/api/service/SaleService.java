@@ -27,26 +27,40 @@ import java.util.UUID;
 public class SaleService {
     private final SaleRepository saleRepository;
     private final StockItemRepository stockItemRepository;
+    private final StockLocationRepository stockLocationRepository;
+    private final LocationRepository locationRepository;
     private final StockService stockService;
     
     public SaleService(
         SaleRepository saleRepository,
         StockItemRepository stockItemRepository,
+        StockLocationRepository stockLocationRepository,
+        LocationRepository locationRepository,
         StockService stockService
     ) {
         this.saleRepository = saleRepository;
         this.stockItemRepository = stockItemRepository;
+        this.stockLocationRepository = stockLocationRepository;
+        this.locationRepository = locationRepository;
         this.stockService = stockService;
     }
     
     @Transactional
     public Sale createSale(CreateSaleRequest request) {
+        // Get the location for the sale
+        Location location = null;
+        if (request.getLocationId() != null) {
+            location = locationRepository.findById(request.getLocationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Location not found"));
+        }
+        
         // Create new sale
         Sale sale = new Sale();
         sale.setCustomerName(request.getCustomerName());
         sale.setCustomerPhone(request.getCustomerPhone());
         sale.setReference(generateReference());
         sale.setStatus(SaleStatus.PENDING);
+        sale.setLocation(location); // Set the location for the sale
         
         // Process each item in the sale
         List<SaleItem> saleItems = new ArrayList<>();
@@ -55,15 +69,66 @@ public class SaleService {
         for (SaleItemRequest itemRequest : request.getItems()) {
             StockItem stockItem = stockItemRepository.findByIdWithLock(itemRequest.getStockItemId())
                 .orElseThrow(() -> new ResourceNotFoundException("Stock item not found"));
+            
+            // Check if we need to use location-specific stock
+            if (location != null) {
+                // Get stock at this location
+                Optional<StockLocation> stockLocationOpt = 
+                    stockLocationRepository.findByStockItemAndLocationWithLock(
+                        itemRequest.getStockItemId(), 
+                        location.getId()
+                    );
                 
-            // Validate and update stock
-            if (stockItem.getQuantity() < itemRequest.getQuantity()) {
-                throw new InsufficientStockException(
-                    "Insufficient stock for item: " + stockItem.getName() +
-                    ". Available: " + stockItem.getQuantity()
+                // If item exists at this location, check its quantity
+                if (stockLocationOpt.isPresent()) {
+                    StockLocation stockLocation = stockLocationOpt.get();
+                    if (stockLocation.getQuantity() < itemRequest.getQuantity()) {
+                        throw new InsufficientStockException(
+                            "Insufficient stock for item: " + stockItem.getName() +
+                            " at location: " + location.getName() +
+                            ". Available: " + stockLocation.getQuantity()
+                        );
+                    }
+                    
+                    // Update location stock
+                    stockLocation.setQuantity(stockLocation.getQuantity() - itemRequest.getQuantity());
+                    stockLocationRepository.save(stockLocation);
+                } else {
+                    throw new InsufficientStockException(
+                        "Item: " + stockItem.getName() + " is not available at location: " + location.getName()
+                    );
+                }
+                
+                // Record stock movement for this location
+                stockService.recordMovement(
+                    StockMovementRequest.builder()
+                        .stockItemId(stockItem.getId())
+                        .quantity(itemRequest.getQuantity())
+                        .type(MovementType.OUT)
+                        .reference(sale.getReference())
+                        .locationId(location.getId())
+                        .build()
+                );
+            } else {
+                // Use global stock (backward compatibility)
+                if (stockItem.getQuantity() < itemRequest.getQuantity()) {
+                    throw new InsufficientStockException(
+                        "Insufficient stock for item: " + stockItem.getName() +
+                        ". Available: " + stockItem.getQuantity()
+                    );
+                }
+                
+                // Record global stock movement
+                stockService.recordMovement(
+                    StockMovementRequest.builder()
+                        .stockItemId(stockItem.getId())
+                        .quantity(itemRequest.getQuantity())
+                        .type(MovementType.OUT)
+                        .reference(sale.getReference())
+                        .build()
                 );
             }
-            
+                
             // Create sale item
             SaleItem saleItem = new SaleItem();
             saleItem.setSale(sale);
@@ -74,34 +139,11 @@ public class SaleService {
             
             saleItems.add(saleItem);
             total = total.add(saleItem.getTotal());
-            
-            // Record stock movement
-            stockService.recordMovement(
-                StockMovementRequest.builder()
-                    .stockItemId(stockItem.getId())
-                    .quantity(itemRequest.getQuantity())
-                    .type(MovementType.OUT)
-                    .reference(sale.getReference())
-                    .build()
-            );
         }
         
         sale.setItems(saleItems);
         sale.setTotal(total);
         
-        return saleRepository.save(sale);
-    }
-    
-    @Transactional
-    public Sale completeSale(UUID saleId) {
-        Sale sale = saleRepository.findById(saleId)
-            .orElseThrow(() -> new ResourceNotFoundException("Sale not found"));
-            
-        if (sale.getStatus() != SaleStatus.PENDING) {
-            throw new IllegalStateException("Sale is not in PENDING status");
-        }
-        
-        sale.setStatus(SaleStatus.COMPLETED);
         return saleRepository.save(sale);
     }
     
@@ -114,24 +156,50 @@ public class SaleService {
             throw new IllegalStateException("Sale is not in PENDING status");
         }
         
+        Location location = sale.getLocation();
+        
         // Reverse stock movements
         for (SaleItem item : sale.getItems()) {
-            stockService.recordMovement(
-                StockMovementRequest.builder()
-                    .stockItemId(item.getStockItem().getId())
-                    .quantity(item.getQuantity())
-                    .type(MovementType.IN)
-                    .reference("CANCEL-" + sale.getReference())
-                    .notes("Sale cancellation")
-                    .build()
-            );
+            if (location != null) {
+                // If location-specific, update location stock
+                Optional<StockLocation> stockLocationOpt = 
+                    stockLocationRepository.findByStockItemAndLocationWithLock(
+                        item.getStockItem().getId(), 
+                        location.getId()
+                    );
+                
+                if (stockLocationOpt.isPresent()) {
+                    StockLocation stockLocation = stockLocationOpt.get();
+                    stockLocation.setQuantity(stockLocation.getQuantity() + item.getQuantity());
+                    stockLocationRepository.save(stockLocation);
+                }
+                
+                // Record location-specific reversal movement
+                stockService.recordMovement(
+                    StockMovementRequest.builder()
+                        .stockItemId(item.getStockItem().getId())
+                        .quantity(item.getQuantity())
+                        .type(MovementType.IN)
+                        .reference("CANCEL-" + sale.getReference())
+                        .notes("Sale cancellation")
+                        .locationId(location.getId())
+                        .build()
+                );
+            } else {
+                // Record global stock reversal
+                stockService.recordMovement(
+                    StockMovementRequest.builder()
+                        .stockItemId(item.getStockItem().getId())
+                        .quantity(item.getQuantity())
+                        .type(MovementType.IN)
+                        .reference("CANCEL-" + sale.getReference())
+                        .notes("Sale cancellation")
+                        .build()
+                );
+            }
         }
         
         sale.setStatus(SaleStatus.CANCELLED);
         return saleRepository.save(sale);
-    }
-    
-    private String generateReference() {
-        return "SALE-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }

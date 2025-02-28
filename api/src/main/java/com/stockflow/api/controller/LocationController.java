@@ -45,7 +45,8 @@ public class LocationController {
     }
 
     @GetMapping("/{id}/inventory")
-    public ResponseEntity<List<Object>> getLocationInventory(@PathVariable UUID id) {
-        return ResponseEntity.ok(locationService.getLocationInventory(id));
+    public ResponseEntity<List<LocationInventoryDTO>> getLocationInventory(@PathVariable UUID id) {
+        List<LocationInventoryDTO> inventory = locationService.getLocationInventory(id);
+        return ResponseEntity.ok(inventory);
     }
 }

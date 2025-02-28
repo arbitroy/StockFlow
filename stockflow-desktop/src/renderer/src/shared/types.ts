@@ -63,6 +63,8 @@ export interface SaleDTO {
   customerName?: string
   customerPhone?: string
   items: SaleItemDTO[]
+  locationId?: string // New field for location
+  locationName?: string // Optional field for displaying location name
   total?: number
   reference?: string
   status?: SaleStatus

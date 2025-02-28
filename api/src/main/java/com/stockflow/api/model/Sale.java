@@ -28,4 +28,9 @@ public class Sale extends BaseEntity {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private SaleStatus status = SaleStatus.PENDING;
+    
+    // Add location relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_id")
+    private Location location;
 }
