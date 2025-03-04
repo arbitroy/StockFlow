@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { LocationDTO, StockItemDTO } from '../../shared/types'
-import notifyService from '../../services/notification'
 import locationService from '../../services/api/locationService'
-import stockService from '../../services/api/stockService'
+import notifyService from '../../services/notification'
 
 interface NewSaleDialogProps {
   isOpen: boolean
@@ -14,134 +13,64 @@ interface NewSaleDialogProps {
     locationId: string
     items: { stockItemId: string; quantity: number; price: number }[]
   }) => Promise<void>
+  preselectedLocationId?: string
+  availableItems?: StockItemDTO[]
+  isLoading?: boolean
 }
 
-const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Element | null => {
+const NewSaleDialog = ({
+  isOpen,
+  onClose,
+  onSave,
+  preselectedLocationId,
+  availableItems = [],
+  isLoading = false
+}: NewSaleDialogProps): JSX.Element | null => {
   const [sale, setSale] = useState({
     customerName: '',
     customerPhone: '',
-    locationId: '', // New field for location
+    locationId: preselectedLocationId || '',
     items: [{ stockItemId: '', quantity: 1, name: '', price: 0, maxQuantity: 0 }]
   })
-  const [availableItems, setAvailableItems] = useState<StockItemDTO[]>([])
   const [locations, setLocations] = useState<LocationDTO[]>([])
-  const [locationInventory, setLocationInventory] = useState<Record<string, any>>({})
-  const [isLoading, setIsLoading] = useState(false)
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
-  const [isLoadingInventory, setIsLoadingInventory] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    // Load available stock items
-    const loadStockItems = async (): Promise<void> => {
-      try {
-        setIsLoading(true)
-        const items = await stockService.getAllStockItems()
-        // Filter out out-of-stock items
-        const inStockItems = items.filter((item) => item.quantity > 0)
-        setAvailableItems(inStockItems)
-      } catch (error) {
-        console.error('Failed to load stock items:', error)
-        notifyService.error('Failed to load available products')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    // Load locations
-    const loadLocations = async (): Promise<void> => {
-      try {
-        setIsLoadingLocations(true)
-        const locs = await locationService.getAllLocations()
-        setLocations(locs)
-      } catch (error) {
-        console.error('Failed to load locations:', error)
-        notifyService.error('Failed to load locations')
-      } finally {
-        setIsLoadingLocations(false)
-      }
-    }
-
-    if (isOpen) {
-      loadStockItems()
-      loadLocations()
-    }
-  }, [isOpen])
-
-  // Load location inventory when location changes
-  useEffect(() => {
-    const loadLocationInventory = async (): Promise<void> => {
-      if (!sale.locationId) return
-
-      try {
-        setIsLoadingInventory(true)
-        const inventory = await locationService.getLocationInventory(sale.locationId)
-
-        // Create a map of stockItemId -> quantity
-        const inventoryMap: Record<string, any> = {}
-        inventory.forEach((item) => {
-          inventoryMap[item.stockItem.id] = {
-            quantity: item.quantity,
-            stockItem: item.stockItem
-          }
-        })
-
-        setLocationInventory(inventoryMap)
-
-        // Reset item selections if they're not available at this location
-        setSale((prev) => {
-          const updatedItems = prev.items.map((item) => {
-            if (!item.stockItemId) return item
-
-            const inventoryItem = inventoryMap[item.stockItemId]
-            if (!inventoryItem) {
-              // Item not available at this location
-              return {
-                stockItemId: '',
-                quantity: 1,
-                name: '',
-                price: 0,
-                maxQuantity: 0
-              }
-            }
-
-            // Update the max quantity based on location inventory
-            return {
-              ...item,
-              maxQuantity: inventoryItem.quantity,
-              // Adjust quantity if it exceeds available
-              quantity: Math.min(item.quantity, inventoryItem.quantity)
-            }
-          })
-
-          return {
-            ...prev,
-            items: updatedItems
-          }
-        })
-      } catch (error) {
-        console.error('Failed to load location inventory:', error)
-        notifyService.error('Failed to load inventory for the selected location')
-      } finally {
-        setIsLoadingInventory(false)
-      }
-    }
-
-    loadLocationInventory()
-  }, [sale.locationId])
-
-  // Reset form when dialog opens/closes
+  // Initialize form when dialog opens or when preselectedLocationId changes
   useEffect(() => {
     if (isOpen) {
       setSale({
         customerName: '',
         customerPhone: '',
-        locationId: '',
+        locationId: preselectedLocationId || '',
         items: [{ stockItemId: '', quantity: 1, name: '', price: 0, maxQuantity: 0 }]
       })
       setErrors({})
     }
-  }, [isOpen])
+  }, [isOpen, preselectedLocationId])
+
+  // Load locations if needed
+  useEffect(() => {
+    const loadLocations = async (): Promise<void> => {
+      if (!preselectedLocationId) {
+        try {
+          setIsLoadingLocations(true)
+          const locs = await locationService.getAllLocations()
+          setLocations(locs)
+        } catch (error) {
+          console.error('Failed to load locations:', error)
+          notifyService.error('Failed to load locations')
+        } finally {
+          setIsLoadingLocations(false)
+        }
+      }
+    }
+
+    if (isOpen) {
+      loadLocations()
+    }
+  }, [isOpen, preselectedLocationId])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = e.target
@@ -163,7 +92,9 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
     const { value } = e.target
     setSale((prev) => ({
       ...prev,
-      locationId: value
+      locationId: value,
+      // Reset items when location changes
+      items: [{ stockItemId: '', quantity: 1, name: '', price: 0, maxQuantity: 0 }]
     }))
 
     // Clear error
@@ -179,33 +110,15 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
     const newItems = [...sale.items]
 
     if (field === 'stockItemId') {
-      // When changing the item, get data from the location inventory
-      if (sale.locationId && value) {
-        const inventoryItem = locationInventory[value as string]
-        if (inventoryItem) {
-          newItems[index] = {
-            ...newItems[index],
-            stockItemId: value as string,
-            name: inventoryItem.stockItem.name,
-            price: inventoryItem.stockItem.price,
-            maxQuantity: inventoryItem.quantity
-          }
-        } else {
-          // If item isn't available at this location, show an error
-          notifyService.warning(`This item isn't available at the selected location`)
-          return
-        }
-      } else {
-        // If no location selected yet, get from general inventory
-        const selectedItem = availableItems.find((item) => item.id === value)
-        if (selectedItem) {
-          newItems[index] = {
-            ...newItems[index],
-            stockItemId: value as string,
-            name: selectedItem.name,
-            price: selectedItem.price,
-            maxQuantity: selectedItem.quantity
-          }
+      // When changing the item, get data from the available items
+      const selectedItem = availableItems.find((item) => item.id === value)
+      if (selectedItem) {
+        newItems[index] = {
+          ...newItems[index],
+          stockItemId: value as string,
+          name: selectedItem.name,
+          price: selectedItem.price,
+          maxQuantity: selectedItem.quantity
         }
       }
     } else {
@@ -266,20 +179,8 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
 
       if (!item.quantity || item.quantity < 1) {
         newErrors[`items[${index}].quantity`] = 'Quantity must be at least 1'
-      }
-
-      // Check against location inventory
-      if (sale.locationId && item.stockItemId) {
-        const inventoryItem = locationInventory[item.stockItemId]
-        if (inventoryItem && item.quantity > inventoryItem.quantity) {
-          newErrors[`items[${index}].quantity`] = `Only ${inventoryItem.quantity} available`
-        }
-      } else if (item.stockItemId) {
-        // Or check against global inventory
-        const stockItem = availableItems.find((i) => i.id === item.stockItemId)
-        if (stockItem && item.quantity > stockItem.quantity) {
-          newErrors[`items[${index}].quantity`] = `Only ${stockItem.quantity} available`
-        }
+      } else if (item.quantity > item.maxQuantity) {
+        newErrors[`items[${index}].quantity`] = `Only ${item.maxQuantity} available`
       }
     })
 
@@ -294,7 +195,7 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
       return
     }
 
-    setIsLoading(true)
+    setIsProcessing(true)
     try {
       // Format sale data for API
       const saleData = {
@@ -309,12 +210,11 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
       }
 
       await onSave(saleData)
-      onClose()
-      notifyService.success('Sale created successfully')
     } catch (error) {
       console.error('Failed to create sale:', error)
+      notifyService.error('Failed to create sale')
     } finally {
-      setIsLoading(false)
+      setIsProcessing(false)
     }
   }
 
@@ -322,16 +222,6 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
     return sale.items.reduce((sum, item) => {
       return sum + item.price * item.quantity
     }, 0)
-  }
-
-  // Filter available items based on selected location
-  const getAvailableItemsForLocation = (): StockItemDTO[] => {
-    if (!sale.locationId || !locationInventory || Object.keys(locationInventory).length === 0) {
-      return availableItems
-    }
-
-    // Return only items available at the selected location
-    return Object.values(locationInventory).map((item) => item.stockItem)
   }
 
   // Animation variants
@@ -374,50 +264,64 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
 
           <form onSubmit={handleSubmit}>
             <div className="px-6 py-4 space-y-6">
-              {/* Location selection - new section */}
+              {/* Location selection */}
               <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
                 <h4 className="font-medium text-gray-900 mb-3">Location</h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label htmlFor="locationId" className="form-label">
-                      Select Location <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="locationId"
-                      name="locationId"
-                      value={sale.locationId}
-                      onChange={handleLocationChange}
-                      className={`form-select ${errors.locationId ? 'border-red-300' : ''}`}
-                      disabled={isLoading || isLoadingLocations}
-                    >
-                      <option value="">Select a location</option>
-                      <optgroup label="Stores">
-                        {locations
-                          .filter((loc) => loc.type === 'STORE')
-                          .map((location) => (
-                            <option key={location.id} value={location.id}>
-                              {location.name}
-                            </option>
-                          ))}
-                      </optgroup>
-                      <optgroup label="Warehouses">
-                        {locations
-                          .filter((loc) => loc.type === 'WAREHOUSE')
-                          .map((location) => (
-                            <option key={location.id} value={location.id}>
-                              {location.name}
-                            </option>
-                          ))}
-                      </optgroup>
-                    </select>
-                    {errors.locationId && (
-                      <p className="mt-1 text-sm text-red-600">{errors.locationId}</p>
-                    )}
-                    {isLoadingInventory && (
-                      <p className="mt-1 text-sm text-blue-600 flex items-center">
-                        <div className="size-3 mr-2 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        Loading inventory for this location...
-                      </p>
+                    {preselectedLocationId ? (
+                      // If location is preselected, show it as read-only
+                      <div>
+                        <label className="form-label">Selected Location</label>
+                        <div className="form-input bg-gray-100 cursor-not-allowed">
+                          {locations.find((loc) => loc.id === preselectedLocationId)?.name ||
+                            'Selected Location'}
+                        </div>
+                      </div>
+                    ) : (
+                      // Otherwise, show location selector
+                      <>
+                        <label htmlFor="locationId" className="form-label">
+                          Select Location <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="locationId"
+                          name="locationId"
+                          value={sale.locationId}
+                          onChange={handleLocationChange}
+                          className={`form-select ${errors.locationId ? 'border-red-300' : ''}`}
+                          disabled={isLoading || isLoadingLocations || isProcessing}
+                        >
+                          <option value="">Select a location</option>
+                          <optgroup label="Stores">
+                            {locations
+                              .filter((loc) => loc.type === 'STORE')
+                              .map((location) => (
+                                <option key={location.id} value={location.id}>
+                                  {location.name}
+                                </option>
+                              ))}
+                          </optgroup>
+                          <optgroup label="Warehouses">
+                            {locations
+                              .filter((loc) => loc.type === 'WAREHOUSE')
+                              .map((location) => (
+                                <option key={location.id} value={location.id}>
+                                  {location.name}
+                                </option>
+                              ))}
+                          </optgroup>
+                        </select>
+                        {errors.locationId && (
+                          <p className="mt-1 text-sm text-red-600">{errors.locationId}</p>
+                        )}
+                        {isLoadingLocations && (
+                          <p className="mt-1 text-sm text-blue-600 flex items-center">
+                            <div className="size-3 mr-2 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            Loading locations...
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -437,6 +341,7 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
                     onChange={handleChange}
                     className="form-input"
                     placeholder="Enter customer name"
+                    disabled={isProcessing}
                   />
                 </div>
 
@@ -452,6 +357,7 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
                     onChange={handleChange}
                     className="form-input"
                     placeholder="Enter customer phone"
+                    disabled={isProcessing}
                   />
                 </div>
               </div>
@@ -463,115 +369,125 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
                   <button
                     type="button"
                     onClick={addItem}
+                    disabled={isProcessing}
                     className="text-primary hover:text-primary-dark text-sm font-medium"
                   >
                     + Add Item
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                  {sale.items.map((item, index) => (
-                    <div key={index} className="bg-gray-50 p-4 rounded-md">
-                      <div className="flex justify-between">
-                        <h5 className="font-medium text-sm text-gray-700">Item #{index + 1}</h5>
-                        {sale.items.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            className="text-red-600 hover:text-red-900 text-sm"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-2">
-                        <div className="md:col-span-6">
-                          <label
-                            htmlFor={`item-${index}-product`}
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Product
-                          </label>
-                          <select
-                            id={`item-${index}-product`}
-                            value={item.stockItemId}
-                            onChange={(e) => handleItemChange(index, 'stockItemId', e.target.value)}
-                            className={`form-select ${
-                              errors[`items[${index}].stockItemId`] ? 'border-red-300' : ''
-                            }`}
-                            disabled={isLoading || !sale.locationId}
-                          >
-                            <option value="">Select a product</option>
-                            {getAvailableItemsForLocation().map((stockItem) => (
-                              <option key={stockItem.id} value={stockItem.id}>
-                                {stockItem.name} (${stockItem.price.toFixed(2)} -
-                                {sale.locationId && locationInventory[stockItem.id!]
-                                  ? ` ${locationInventory[stockItem.id!].quantity} available`
-                                  : ` ${stockItem.quantity} available`}
-                                )
-                              </option>
-                            ))}
-                          </select>
-                          {errors[`items[${index}].stockItemId`] && (
-                            <p className="mt-1 text-sm text-red-600">
-                              {errors[`items[${index}].stockItemId`]}
-                            </p>
-                          )}
-                          {!sale.locationId && (
-                            <p className="mt-1 text-sm text-amber-600">
-                              Please select a location first
-                            </p>
+                {isLoading ? (
+                  <div className="bg-gray-50 p-8 rounded-md flex justify-center items-center">
+                    <div className="size-8 border-4 border-primary border-t-transparent rounded-full animate-spin mr-3"></div>
+                    <p className="text-gray-600">Loading inventory for this location...</p>
+                  </div>
+                ) : availableItems.length === 0 ? (
+                  <div className="bg-gray-50 p-8 rounded-md text-center">
+                    <p className="text-gray-600">No items available at this location</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Please transfer stock to this location before creating a sale
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {sale.items.map((item, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-md">
+                        <div className="flex justify-between">
+                          <h5 className="font-medium text-sm text-gray-700">Item #{index + 1}</h5>
+                          {sale.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              disabled={isProcessing}
+                              className="text-red-600 hover:text-red-900 text-sm"
+                            >
+                              Remove
+                            </button>
                           )}
                         </div>
 
-                        <div className="md:col-span-2">
-                          <label
-                            htmlFor={`item-${index}-quantity`}
-                            className="block text-sm font-medium text-gray-700 mb-1"
-                          >
-                            Qty
-                          </label>
-                          <input
-                            type="number"
-                            id={`item-${index}-quantity`}
-                            value={item.quantity}
-                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                            min="1"
-                            max={item.maxQuantity}
-                            className={`form-input ${
-                              errors[`items[${index}].quantity`] ? 'border-red-300' : ''
-                            }`}
-                            disabled={!item.stockItemId}
-                          />
-                          {errors[`items[${index}].quantity`] && (
-                            <p className="mt-1 text-sm text-red-600">
-                              {errors[`items[${index}].quantity`]}
-                            </p>
-                          )}
-                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-2">
+                          <div className="md:col-span-6">
+                            <label
+                              htmlFor={`item-${index}-product`}
+                              className="block text-sm font-medium text-gray-700 mb-1"
+                            >
+                              Product
+                            </label>
+                            <select
+                              id={`item-${index}-product`}
+                              value={item.stockItemId}
+                              onChange={(e) =>
+                                handleItemChange(index, 'stockItemId', e.target.value)
+                              }
+                              className={`form-select ${
+                                errors[`items[${index}].stockItemId`] ? 'border-red-300' : ''
+                              }`}
+                              disabled={isProcessing}
+                            >
+                              <option value="">Select a product</option>
+                              {availableItems.map((stockItem) => (
+                                <option key={stockItem.id} value={stockItem.id}>
+                                  {stockItem.name} (${stockItem.price.toFixed(2)} -{' '}
+                                  {stockItem.quantity} available)
+                                </option>
+                              ))}
+                            </select>
+                            {errors[`items[${index}].stockItemId`] && (
+                              <p className="mt-1 text-sm text-red-600">
+                                {errors[`items[${index}].stockItemId`]}
+                              </p>
+                            )}
+                          </div>
 
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Price
-                          </label>
-                          <div className="form-input bg-gray-100 cursor-not-allowed">
-                            ${item.price.toFixed(2)}
+                          <div className="md:col-span-2">
+                            <label
+                              htmlFor={`item-${index}-quantity`}
+                              className="block text-sm font-medium text-gray-700 mb-1"
+                            >
+                              Qty
+                            </label>
+                            <input
+                              type="number"
+                              id={`item-${index}-quantity`}
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                              min="1"
+                              max={item.maxQuantity}
+                              className={`form-input ${
+                                errors[`items[${index}].quantity`] ? 'border-red-300' : ''
+                              }`}
+                              disabled={!item.stockItemId || isProcessing}
+                            />
+                            {errors[`items[${index}].quantity`] && (
+                              <p className="mt-1 text-sm text-red-600">
+                                {errors[`items[${index}].quantity`]}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Price
+                            </label>
+                            <div className="form-input bg-gray-100 cursor-not-allowed">
+                              ${item.price.toFixed(2)}
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Total
+                            </label>
+                            <div className="form-input bg-gray-100 cursor-not-allowed font-medium">
+                              ${(item.price * item.quantity).toFixed(2)}
+                            </div>
                           </div>
                         </div>
-
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Total
-                          </label>
-                          <div className="form-input bg-gray-100 cursor-not-allowed font-medium">
-                            ${(item.price * item.quantity).toFixed(2)}
-                          </div>
-                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Sale Summary */}
@@ -591,12 +507,16 @@ const NewSaleDialog = ({ isOpen, onClose, onSave }: NewSaleDialogProps): JSX.Ele
                 type="button"
                 onClick={onClose}
                 className="btn btn-outline"
-                disabled={isLoading}
+                disabled={isProcessing}
               >
                 Cancel
               </button>
-              <button type="submit" disabled={isLoading} className="btn btn-primary">
-                {isLoading ? (
+              <button
+                type="submit"
+                disabled={isProcessing || isLoading || availableItems.length === 0}
+                className="btn btn-primary"
+              >
+                {isProcessing ? (
                   <>
                     <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Processing...</span>

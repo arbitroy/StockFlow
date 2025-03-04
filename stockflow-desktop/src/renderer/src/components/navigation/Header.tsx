@@ -18,7 +18,8 @@ const Header = ({ toggleSidebar, isSidebarOpen }: HeaderProps): JSX.Element => {
         navigate('/inventory?action=add')
         break
       case 'Quick Sale':
-        navigate('/sales?action=new')
+        // Updated to use our new sales flow
+        navigate('/sales/new')
         break
       default:
         notifyService.info(`${action} action triggered`)

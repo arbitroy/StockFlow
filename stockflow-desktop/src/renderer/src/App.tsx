@@ -9,6 +9,7 @@ import Locations from './pages/Locations'
 import LocationInventory from './pages/LocationInventory'
 import Reports from './pages/Reports'
 import Sales from './pages/Sales'
+import SalesFlow from './pages/SalesFlow'
 import Settings from './pages/Settings'
 import Transfers from './pages/Transfers'
 import NotFound from './pages/NotFound'
@@ -53,6 +54,10 @@ const router = createHashRouter([
       {
         path: 'sales',
         element: <Sales />
+      },
+      {
+        path: 'sales/new',
+        element: <SalesFlow />
       },
       {
         path: 'settings',
