@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { LocationDTO, StockItemDTO, TransferRequest } from '../../shared/types'
-import notifyService from '../../services/notification'
 
 interface TransferDialogProps {
   isOpen: boolean
@@ -34,6 +33,7 @@ const TransferDialog = ({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [availableStock, setAvailableStock] = useState<number>(0)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<StockItemDTO | null>(null)
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -48,6 +48,7 @@ const TransferDialog = ({
       })
       setErrors({})
       setAvailableStock(0)
+      setSelectedItem(null)
     }
   }, [isOpen, preselectedSourceId])
 
@@ -79,16 +80,19 @@ const TransferDialog = ({
       }))
     }
 
-    // Update available stock when changing stockItem or sourceLocation
-    if (name === 'stockItemId' || name === 'sourceLocationId') {
-      // This would ideally fetch from an API to get the exact stock at the location
-      // For now, we'll use a simplified approach
-      const item = stockItems.find(
-        (item) => item.id === (name === 'stockItemId' ? value : transferData.stockItemId)
-      )
+    // Update available stock when changing stockItem
+    if (name === 'stockItemId') {
+      const item = stockItems.find((item) => item.id === value)
       if (item) {
+        setSelectedItem(item)
         setAvailableStock(item.quantity)
+        // Set quantity to 1 when item changes
+        setTransferData((prev) => ({
+          ...prev,
+          quantity: 1
+        }))
       } else {
+        setSelectedItem(null)
         setAvailableStock(0)
       }
     }
@@ -134,21 +138,19 @@ const TransferDialog = ({
     try {
       await onConfirm(transferData)
       onClose()
-      notifyService.success('Stock transfer initiated successfully')
     } catch (error) {
       console.error('Error processing transfer:', error)
-      notifyService.error('Failed to process stock transfer')
+      // Error is already shown via notify service in the transferService
     } finally {
       setIsProcessing(false)
     }
   }
 
-  // Filter locations by type
-  const warehouseLocations = locations.filter((loc) => loc.type === 'WAREHOUSE')
-  const storeLocations = locations.filter((loc) => loc.type === 'STORE')
-
-  // Only return JSX if the dialog is open
-  if (!isOpen) return null
+  // Get location name by ID
+  const getLocationName = (id: string): string => {
+    const location = locations.find((loc) => loc.id === id)
+    return location ? location.name : id
+  }
 
   // Animation variants
   const overlayVariants = {
@@ -162,239 +164,283 @@ const TransferDialog = ({
     exit: { opacity: 0, scale: 0.95, y: 20, transition: { duration: 0.2 } }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <motion.div
-        className="fixed inset-0 bg-[rgba(0,0,0,0.5)] transition-opacity"
-        initial="hidden"
-        animate="visible"
-        exit="hidden"
-        variants={overlayVariants}
-        onClick={onClose}
-      />
+  // Only return JSX if the dialog is open
+  if (!isOpen) return null
 
-      <div className="flex items-center justify-center min-h-screen p-4">
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 overflow-y-auto">
         <motion.div
-          className="bg-white rounded-lg shadow-xl w-full z-100 max-w-md mx-auto"
+          className="fixed inset-0 bg-[rgba(0,0,0,0.5)] transition-opacity"
           initial="hidden"
           animate="visible"
-          exit="exit"
-          variants={dialogVariants}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-primary-dark">Transfer Stock</h3>
-          </div>
+          exit="hidden"
+          variants={overlayVariants}
+          onClick={onClose}
+        />
 
-          <div className="px-6 py-4 space-y-4">
-            {/* Stock Item Selection */}
-            <div>
-              <label htmlFor="stockItemId" className="form-label">
-                Stock Item
-              </label>
-              <select
-                id="stockItemId"
-                name="stockItemId"
-                value={transferData.stockItemId}
-                onChange={handleChange}
-                className={`form-select ${errors.stockItemId ? 'border-red-300' : ''}`}
-                disabled={isLoading || isProcessing}
-              >
-                <option value="">Select an item</option>
-                {stockItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.sku}) - {item.quantity} available
-                  </option>
-                ))}
-              </select>
-              {errors.stockItemId && (
-                <p className="mt-1 text-sm text-red-600">{errors.stockItemId}</p>
-              )}
+        <div className="flex items-center justify-center min-h-screen p-4">
+          <motion.div
+            className="bg-white rounded-lg shadow-xl w-full z-100 max-w-md mx-auto"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={dialogVariants}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-primary-dark">Transfer Stock</h3>
             </div>
 
-            {/* Source Location */}
-            <div>
-              <label htmlFor="sourceLocationId" className="form-label">
-                From (Source Location)
-              </label>
-              <select
-                id="sourceLocationId"
-                name="sourceLocationId"
-                value={transferData.sourceLocationId}
-                onChange={handleChange}
-                className={`form-select ${errors.sourceLocationId ? 'border-red-300' : ''}`}
-                disabled={isLoading || isProcessing}
-              >
-                <option value="">Select source location</option>
-                <optgroup label="Warehouses">
-                  {warehouseLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Stores">
-                  {storeLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-              {errors.sourceLocationId && (
-                <p className="mt-1 text-sm text-red-600">{errors.sourceLocationId}</p>
-              )}
-            </div>
-
-            {/* Target Location */}
-            <div>
-              <label htmlFor="targetLocationId" className="form-label">
-                To (Target Location)
-              </label>
-              <select
-                id="targetLocationId"
-                name="targetLocationId"
-                value={transferData.targetLocationId}
-                onChange={handleChange}
-                className={`form-select ${errors.targetLocationId ? 'border-red-300' : ''}`}
-                disabled={isLoading || isProcessing}
-              >
-                <option value="">Select target location</option>
-                <optgroup label="Stores">
-                  {storeLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Warehouses">
-                  {warehouseLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-              {errors.targetLocationId && (
-                <p className="mt-1 text-sm text-red-600">{errors.targetLocationId}</p>
-              )}
-            </div>
-
-            {/* Quantity */}
-            <div>
-              <label htmlFor="quantity" className="form-label">
-                Quantity to Transfer
-              </label>
-              <div className="flex items-center">
-                <input
-                  type="number"
-                  id="quantity"
-                  name="quantity"
-                  value={transferData.quantity}
+            <div className="px-6 py-4 space-y-4">
+              {/* Stock Item Selection */}
+              <div>
+                <label htmlFor="stockItemId" className="form-label">
+                  Stock Item
+                </label>
+                <select
+                  id="stockItemId"
+                  name="stockItemId"
+                  value={transferData.stockItemId}
                   onChange={handleChange}
-                  min="1"
-                  max={availableStock}
-                  className={`form-input ${errors.quantity ? 'border-red-300' : ''}`}
+                  className={`form-select ${errors.stockItemId ? 'border-red-300' : ''}`}
                   disabled={isLoading || isProcessing}
-                />
-                {availableStock > 0 && (
-                  <button
-                    type="button"
-                    className="ml-2 text-primary hover:text-primary-dark text-sm"
-                    onClick={() =>
-                      setTransferData((prev) => ({ ...prev, quantity: availableStock }))
-                    }
-                    disabled={isLoading || isProcessing}
-                  >
-                    Max
-                  </button>
+                >
+                  <option value="">Select an item</option>
+                  {stockItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({item.sku}) - {item.quantity} available
+                    </option>
+                  ))}
+                </select>
+                {errors.stockItemId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.stockItemId}</p>
                 )}
               </div>
-              {errors.quantity && <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>}
-              {availableStock > 0 && !errors.quantity && (
-                <p className="mt-1 text-sm text-gray-500">Available: {availableStock} units</p>
+
+              {/* Source Location */}
+              <div>
+                <label htmlFor="sourceLocationId" className="form-label">
+                  From (Source Location)
+                </label>
+                <select
+                  id="sourceLocationId"
+                  name="sourceLocationId"
+                  value={transferData.sourceLocationId}
+                  onChange={handleChange}
+                  className={`form-select ${errors.sourceLocationId ? 'border-red-300' : ''}`}
+                  disabled={isLoading || isProcessing || !!preselectedSourceId}
+                >
+                  <option value="">Select source location</option>
+                  <optgroup label="Warehouses">
+                    {locations
+                      .filter((loc) => loc.type === 'WAREHOUSE')
+                      .map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Stores">
+                    {locations
+                      .filter((loc) => loc.type === 'STORE')
+                      .map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+                {errors.sourceLocationId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.sourceLocationId}</p>
+                )}
+                {preselectedSourceId && (
+                  <p className="mt-1 text-sm text-blue-600">
+                    Using {getLocationName(preselectedSourceId)} as source
+                  </p>
+                )}
+              </div>
+
+              {/* Target Location */}
+              <div>
+                <label htmlFor="targetLocationId" className="form-label">
+                  To (Target Location)
+                </label>
+                <select
+                  id="targetLocationId"
+                  name="targetLocationId"
+                  value={transferData.targetLocationId}
+                  onChange={handleChange}
+                  className={`form-select ${errors.targetLocationId ? 'border-red-300' : ''}`}
+                  disabled={isLoading || isProcessing}
+                >
+                  <option value="">Select target location</option>
+                  <optgroup label="Stores">
+                    {locations
+                      .filter(
+                        (loc) => loc.type === 'STORE' && loc.id !== transferData.sourceLocationId
+                      )
+                      .map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Warehouses">
+                    {locations
+                      .filter(
+                        (loc) =>
+                          loc.type === 'WAREHOUSE' && loc.id !== transferData.sourceLocationId
+                      )
+                      .map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+                {errors.targetLocationId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.targetLocationId}</p>
+                )}
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <label htmlFor="quantity" className="form-label">
+                  Quantity to Transfer
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    id="quantity"
+                    name="quantity"
+                    value={transferData.quantity}
+                    onChange={handleChange}
+                    min="1"
+                    max={availableStock}
+                    className={`form-input ${errors.quantity ? 'border-red-300' : ''}`}
+                    disabled={isLoading || isProcessing || !selectedItem}
+                  />
+                  {availableStock > 0 && (
+                    <button
+                      type="button"
+                      className="ml-2 text-primary hover:text-primary-dark text-sm"
+                      onClick={() =>
+                        setTransferData((prev) => ({ ...prev, quantity: availableStock }))
+                      }
+                      disabled={isLoading || isProcessing}
+                    >
+                      Max
+                    </button>
+                  )}
+                </div>
+                {errors.quantity && <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>}
+                {availableStock > 0 && !errors.quantity && (
+                  <p className="mt-1 text-sm text-gray-500">Available: {availableStock} units</p>
+                )}
+              </div>
+
+              {/* Reference */}
+              <div>
+                <label htmlFor="reference" className="form-label">
+                  Reference (Optional)
+                </label>
+                <input
+                  type="text"
+                  id="reference"
+                  name="reference"
+                  value={transferData.reference}
+                  onChange={handleChange}
+                  className="form-input"
+                  placeholder="e.g., TRANSFER-20250226"
+                  disabled={isLoading || isProcessing}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label htmlFor="notes" className="form-label">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  id="notes"
+                  name="notes"
+                  value={transferData.notes}
+                  onChange={handleChange}
+                  className="form-input"
+                  rows={2}
+                  placeholder="Additional information about this transfer"
+                  disabled={isLoading || isProcessing}
+                />
+              </div>
+
+              {/* Transfer Preview */}
+              {selectedItem && transferData.sourceLocationId && transferData.targetLocationId && (
+                <div className="bg-blue-50 p-3 rounded-md">
+                  <h4 className="text-sm font-medium text-blue-800 mb-2">Transfer Preview</h4>
+                  <p className="text-sm text-blue-800">
+                    Moving{' '}
+                    <span className="font-medium">
+                      {transferData.quantity}x {selectedItem.name}
+                    </span>{' '}
+                    from{' '}
+                    <span className="font-medium">
+                      {getLocationName(transferData.sourceLocationId)}
+                    </span>{' '}
+                    to{' '}
+                    <span className="font-medium">
+                      {getLocationName(transferData.targetLocationId)}
+                    </span>
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* Reference */}
-            <div>
-              <label htmlFor="reference" className="form-label">
-                Reference (Optional)
-              </label>
-              <input
-                type="text"
-                id="reference"
-                name="reference"
-                value={transferData.reference}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="e.g., TRANSFER-20250226"
-                disabled={isLoading || isProcessing}
-              />
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-outline"
+                disabled={isProcessing}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={isProcessing || isLoading}
+                className="btn btn-primary"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="size-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                      />
+                    </svg>
+                    <span>Transfer Stock</span>
+                  </>
+                )}
+              </button>
             </div>
-
-            {/* Notes */}
-            <div>
-              <label htmlFor="notes" className="form-label">
-                Notes (Optional)
-              </label>
-              <textarea
-                id="notes"
-                name="notes"
-                value={transferData.notes}
-                onChange={handleChange}
-                className="form-input"
-                rows={2}
-                placeholder="Additional information about this transfer"
-                disabled={isLoading || isProcessing}
-              />
-            </div>
-          </div>
-
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-outline"
-              disabled={isProcessing}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={isProcessing || isLoading}
-              className="btn btn-primary"
-            >
-              {isProcessing ? (
-                <>
-                  <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="size-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                    />
-                  </svg>
-                  <span>Transfer Stock</span>
-                </>
-              )}
-            </button>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </AnimatePresence>
   )
 }
 

@@ -23,4 +23,7 @@ public class StockMovementRequest {
     
     private String reference;
     private String notes;
+    
+    // Add location ID field
+    private UUID locationId;
 }

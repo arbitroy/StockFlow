@@ -148,14 +148,21 @@ const Inventory = (): JSX.Element => {
   // Handle stock transfer
   const handleTransfer = async (transferData: TransferRequest): Promise<void> => {
     try {
+      // Show loading notification
+      const notification = notifyService.loading('Processing stock transfer...')
+
       await transferService.transferStock(transferData)
+
+      // Success message is shown in the transferService
+      notification.dismiss()
+
       // Refresh stock items after successful transfer
       await handleRefresh()
     } catch (error) {
       console.error('Failed to transfer stock:', error)
-      throw error
+      // Error is shown in the transferService, no need to show it again
     }
-  }
+  } 
 
   return (
     <div className="space-y-6">

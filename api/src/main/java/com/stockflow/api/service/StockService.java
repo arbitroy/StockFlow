@@ -6,8 +6,10 @@ import com.stockflow.api.enums.MovementType;
 import com.stockflow.api.enums.StockStatus;
 import com.stockflow.api.exception.InsufficientStockException;
 import com.stockflow.api.exception.ResourceNotFoundException;
+import com.stockflow.api.model.Location;
 import com.stockflow.api.model.StockItem;
 import com.stockflow.api.model.StockMovement;
+import com.stockflow.api.repository.LocationRepository;
 import com.stockflow.api.repository.StockItemRepository;
 import com.stockflow.api.repository.StockMovementRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +27,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class StockService {
     private final StockItemRepository stockItemRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final LocationRepository locationRepository;
 
     public StockService(
             StockItemRepository stockItemRepository,
-            StockMovementRepository stockMovementRepository) {
+            StockMovementRepository stockMovementRepository,
+            LocationRepository locationRepository) {
         this.stockItemRepository = stockItemRepository;
         this.stockMovementRepository = stockMovementRepository;
+        this.locationRepository = locationRepository;
     }
 
     @Transactional
@@ -60,6 +65,13 @@ public class StockService {
         movement.setType(request.getType());
         movement.setReference(request.getReference());
         movement.setNotes(request.getNotes());
+        
+        // Set location if provided
+        if (request.getLocationId() != null) {
+            Location location = locationRepository.findById(request.getLocationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Location not found"));
+            movement.setLocation(location);
+        }
 
         stockItemRepository.save(item);
         return stockMovementRepository.save(movement);

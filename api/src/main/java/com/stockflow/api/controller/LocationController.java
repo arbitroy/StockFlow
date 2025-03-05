@@ -1,6 +1,7 @@
 package com.stockflow.api.controller;
 
 import com.stockflow.api.dto.LocationDTO;
+import com.stockflow.api.dto.LocationInventoryDTO;
 import com.stockflow.api.service.LocationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

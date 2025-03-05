@@ -7,11 +7,15 @@ import com.stockflow.api.enums.MovementType;
 import com.stockflow.api.enums.SaleStatus;
 import com.stockflow.api.exception.InsufficientStockException;
 import com.stockflow.api.exception.ResourceNotFoundException;
+import com.stockflow.api.model.Location;
 import com.stockflow.api.model.Sale;
 import com.stockflow.api.model.SaleItem;
 import com.stockflow.api.model.StockItem;
+import com.stockflow.api.model.StockLocation;
 import com.stockflow.api.repository.SaleRepository;
 import com.stockflow.api.repository.StockItemRepository;
+import com.stockflow.api.repository.StockLocationRepository;
+import com.stockflow.api.repository.LocationRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -201,5 +206,10 @@ public class SaleService {
         
         sale.setStatus(SaleStatus.CANCELLED);
         return saleRepository.save(sale);
+    }
+    
+    // Helper method to generate a unique reference for a sale
+    private String generateReference() {
+        return "SALE-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }

@@ -1,6 +1,8 @@
 package com.stockflow.api.service;
 
 import com.stockflow.api.dto.LocationDTO;
+import com.stockflow.api.dto.LocationInventoryDTO;
+import com.stockflow.api.dto.StockItemDTO;
 import com.stockflow.api.enums.LocationType;
 import com.stockflow.api.exception.ResourceNotFoundException;
 import com.stockflow.api.model.Location;
@@ -12,9 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -89,7 +89,7 @@ public class LocationService {
     /**
      * Get inventory at a location
      */
-    public List<Object> getLocationInventory(UUID locationId) {
+    public List<LocationInventoryDTO> getLocationInventory(UUID locationId) {
         // First verify the location exists
         locationRepository.findById(locationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Location not found with id: " + locationId));
@@ -97,27 +97,27 @@ public class LocationService {
         // Get stock items at this location
         List<StockLocation> stockLocations = stockLocationRepository.findByLocationId(locationId);
         
-        // Convert to map structure expected by frontend
+        // Convert to DTOs
         return stockLocations.stream()
                 .map(sl -> {
-                    Map<String, Object> item = new HashMap<>();
-                    Map<String, Object> stockItemMap = new HashMap<>();
+                    StockItemDTO stockItemDTO = StockItemDTO.builder()
+                            .id(sl.getStockItem().getId())
+                            .name(sl.getStockItem().getName())
+                            .sku(sl.getStockItem().getSku())
+                            .price(sl.getStockItem().getPrice())
+                            .quantity(sl.getStockItem().getQuantity())
+                            .status(sl.getStockItem().getStatus())
+                            .createdAt(sl.getStockItem().getCreatedAt())
+                            .updatedAt(sl.getStockItem().getUpdatedAt())
+                            .build();
                     
-                    stockItemMap.put("id", sl.getStockItem().getId());
-                    stockItemMap.put("name", sl.getStockItem().getName());
-                    stockItemMap.put("sku", sl.getStockItem().getSku());
-                    stockItemMap.put("price", sl.getStockItem().getPrice());
-                    stockItemMap.put("quantity", sl.getStockItem().getQuantity());
-                    stockItemMap.put("status", sl.getStockItem().getStatus());
-                    stockItemMap.put("createdAt", sl.getStockItem().getCreatedAt());
-                    stockItemMap.put("updatedAt", sl.getStockItem().getUpdatedAt());
-                    
-                    item.put("stockItem", stockItemMap);
-                    item.put("quantity", sl.getQuantity());
-                    item.put("locationId", locationId);
-                    
-                    return item;
-                }).collect(Collectors.toList());
+                    return LocationInventoryDTO.builder()
+                            .stockItem(stockItemDTO)
+                            .quantity(sl.getQuantity())
+                            .locationId(locationId)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
     
     // Helper method to convert Location entity to LocationDTO
