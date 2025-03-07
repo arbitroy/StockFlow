@@ -17,31 +17,33 @@ import java.util.UUID;
 
 @Repository
 public interface StockLocationRepository extends JpaRepository<StockLocation, UUID> {
-    
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT sl FROM StockLocation sl WHERE sl.stockItem.id = :itemId AND sl.location.id = :locationId")
     Optional<StockLocation> findByStockItemAndLocationWithLock(
-        @Param("itemId") UUID itemId,
-        @Param("locationId") UUID locationId
-    );
-    
+            @Param("itemId") UUID itemId,
+            @Param("locationId") UUID locationId);
+
     @Modifying
     @Query("UPDATE StockLocation sl SET sl.openingQuantity = sl.quantity")
     void updateAllOpeningQuantities();
-    
+
     @Query("""
-        SELECT 
-            sl.location.id as locationId, 
-            sl.stockItem.id as itemId, 
-            sl.openingQuantity as quantity
-        FROM StockLocation sl
-        WHERE DATE(sl.updatedAt) <= :date
-    """)
+                SELECT
+                    sl.location.id as locationId,
+                    sl.stockItem.id as itemId,
+                    sl.openingQuantity as quantity
+                FROM StockLocation sl
+                WHERE DATE(sl.updatedAt) <= :date
+            """)
     Map<UUID, Map<UUID, Integer>> findOpeningStockForDate(@Param("date") LocalDate date);
-    
+
     // Added methods for LocationService
     List<StockLocation> findByLocationId(UUID locationId);
-    
+
     @Query("SELECT COUNT(sl) FROM StockLocation sl WHERE sl.location.id = :locationId")
     long countByLocationId(@Param("locationId") UUID locationId);
+
+    @Query("SELECT DISTINCT sl.location.id FROM StockLocation sl")
+    List<UUID> findDistinctLocationIds();
 }
