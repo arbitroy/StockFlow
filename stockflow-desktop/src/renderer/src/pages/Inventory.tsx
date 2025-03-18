@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { StockItemDTO, TransferRequest } from '../shared/types'
+import { StockItemDTO, TransferRequest, LocationDTO } from '../shared/types'
 import stockService from '../services/api/stockService'
 import transferService from '../services/api/transferService'
+import locationService from '../services/api/locationService'
 import notifyService from '../services/notification'
 import { PageHeader } from '../components/ui/PageHeader'
 import StockItemDialog from '../components/inventory/StockItemDialog'
@@ -17,30 +18,29 @@ const Inventory = (): JSX.Element => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<StockItemDTO | undefined>(undefined)
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
-  interface Location {
-    id: string
-    name: string
-    type: 'WAREHOUSE' | 'STORE'
-  }
 
-  const [locations] = useState<Location[]>([
-    // Mock locations for now - would be fetched from API
-    { id: '1', name: 'Main Warehouse', type: 'WAREHOUSE' },
-    { id: '2', name: 'Downtown Store', type: 'STORE' },
-    { id: '3', name: 'East Distribution Center', type: 'WAREHOUSE' },
-    { id: '4', name: 'North Retail', type: 'STORE' }
-  ])
+  // State for locations
+  const [locations, setLocations] = useState<LocationDTO[]>([])
+  const [isLocationsLoading, setIsLocationsLoading] = useState(true)
 
-  // Load stock items
+  // Load stock items and locations
   useEffect(() => {
-    const loadStockItems = async (): Promise<void> => {
+    const loadData = async (): Promise<void> => {
       try {
         setIsLoading(true)
         setIsError(false)
-        const data = await stockService.getAllStockItems()
-        setStockItems(data)
+
+        // Fetch stock items
+        const stockData = await stockService.getAllStockItems()
+        setStockItems(stockData)
+
+        // Fetch locations
+        setIsLocationsLoading(true)
+        const locationsData = await locationService.getAllLocations()
+        setLocations(locationsData)
+        setIsLocationsLoading(false)
       } catch (error) {
-        console.error('Failed to load stock items:', error)
+        console.error('Failed to load data:', error)
         setIsError(true)
         notifyService.error('Failed to load inventory data')
       } finally {
@@ -48,7 +48,7 @@ const Inventory = (): JSX.Element => {
       }
     }
 
-    loadStockItems()
+    loadData()
   }, [])
 
   // Filter items based on search query and status
@@ -134,8 +134,15 @@ const Inventory = (): JSX.Element => {
   const handleRefresh = async (): Promise<void> => {
     try {
       setIsLoading(true)
-      const data = await stockService.getAllStockItems()
-      setStockItems(data)
+
+      // Refresh stock items
+      const stockData = await stockService.getAllStockItems()
+      setStockItems(stockData)
+
+      // Refresh locations
+      const locationsData = await locationService.getAllLocations()
+      setLocations(locationsData)
+
       notifyService.success('Inventory refreshed successfully')
     } catch (error) {
       console.error('Failed to refresh inventory:', error)
@@ -162,7 +169,7 @@ const Inventory = (): JSX.Element => {
       console.error('Failed to transfer stock:', error)
       // Error is shown in the transferService, no need to show it again
     }
-  } 
+  }
 
   return (
     <div className="space-y-6">
@@ -313,7 +320,7 @@ const Inventory = (): JSX.Element => {
         onConfirm={handleTransfer}
         stockItems={stockItems.filter((item) => item.quantity > 0)}
         locations={locations}
-        isLoading={isLoading}
+        isLoading={isLocationsLoading || isLoading}
       />
     </div>
   )

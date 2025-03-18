@@ -152,6 +152,9 @@ const TransferDialog = ({
     return location ? location.name : id
   }
 
+  // Check if there are enough valid locations for a transfer
+  const hasValidLocations = locations.length >= 2
+
   // Animation variants
   const overlayVariants = {
     hidden: { opacity: 0 },
@@ -192,251 +195,301 @@ const TransferDialog = ({
               <h3 className="text-lg font-semibold text-primary-dark">Transfer Stock</h3>
             </div>
 
-            <div className="px-6 py-4 space-y-4">
-              {/* Stock Item Selection */}
-              <div>
-                <label htmlFor="stockItemId" className="form-label">
-                  Stock Item
-                </label>
-                <select
-                  id="stockItemId"
-                  name="stockItemId"
-                  value={transferData.stockItemId}
-                  onChange={handleChange}
-                  className={`form-select ${errors.stockItemId ? 'border-red-300' : ''}`}
-                  disabled={isLoading || isProcessing}
-                >
-                  <option value="">Select an item</option>
-                  {stockItems.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} ({item.sku}) - {item.quantity} available
-                    </option>
-                  ))}
-                </select>
-                {errors.stockItemId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.stockItemId}</p>
-                )}
-              </div>
-
-              {/* Source Location */}
-              <div>
-                <label htmlFor="sourceLocationId" className="form-label">
-                  From (Source Location)
-                </label>
-                <select
-                  id="sourceLocationId"
-                  name="sourceLocationId"
-                  value={transferData.sourceLocationId}
-                  onChange={handleChange}
-                  className={`form-select ${errors.sourceLocationId ? 'border-red-300' : ''}`}
-                  disabled={isLoading || isProcessing || !!preselectedSourceId}
-                >
-                  <option value="">Select source location</option>
-                  <optgroup label="Warehouses">
-                    {locations
-                      .filter((loc) => loc.type === 'WAREHOUSE')
-                      .map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </option>
-                      ))}
-                  </optgroup>
-                  <optgroup label="Stores">
-                    {locations
-                      .filter((loc) => loc.type === 'STORE')
-                      .map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </option>
-                      ))}
-                  </optgroup>
-                </select>
-                {errors.sourceLocationId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.sourceLocationId}</p>
-                )}
-                {preselectedSourceId && (
-                  <p className="mt-1 text-sm text-blue-600">
-                    Using {getLocationName(preselectedSourceId)} as source
-                  </p>
-                )}
-              </div>
-
-              {/* Target Location */}
-              <div>
-                <label htmlFor="targetLocationId" className="form-label">
-                  To (Target Location)
-                </label>
-                <select
-                  id="targetLocationId"
-                  name="targetLocationId"
-                  value={transferData.targetLocationId}
-                  onChange={handleChange}
-                  className={`form-select ${errors.targetLocationId ? 'border-red-300' : ''}`}
-                  disabled={isLoading || isProcessing}
-                >
-                  <option value="">Select target location</option>
-                  <optgroup label="Stores">
-                    {locations
-                      .filter(
-                        (loc) => loc.type === 'STORE' && loc.id !== transferData.sourceLocationId
-                      )
-                      .map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </option>
-                      ))}
-                  </optgroup>
-                  <optgroup label="Warehouses">
-                    {locations
-                      .filter(
-                        (loc) =>
-                          loc.type === 'WAREHOUSE' && loc.id !== transferData.sourceLocationId
-                      )
-                      .map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </option>
-                      ))}
-                  </optgroup>
-                </select>
-                {errors.targetLocationId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.targetLocationId}</p>
-                )}
-              </div>
-
-              {/* Quantity */}
-              <div>
-                <label htmlFor="quantity" className="form-label">
-                  Quantity to Transfer
-                </label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    id="quantity"
-                    name="quantity"
-                    value={transferData.quantity}
-                    onChange={handleChange}
-                    min="1"
-                    max={availableStock}
-                    className={`form-input ${errors.quantity ? 'border-red-300' : ''}`}
-                    disabled={isLoading || isProcessing || !selectedItem}
-                  />
-                  {availableStock > 0 && (
-                    <button
-                      type="button"
-                      className="ml-2 text-primary hover:text-primary-dark text-sm"
-                      onClick={() =>
-                        setTransferData((prev) => ({ ...prev, quantity: availableStock }))
-                      }
-                      disabled={isLoading || isProcessing}
-                    >
-                      Max
-                    </button>
-                  )}
+            {isLoading ? (
+              <div className="px-6 py-12 text-center">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="size-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-4 text-gray-500">Loading location data...</p>
                 </div>
-                {errors.quantity && <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>}
-                {availableStock > 0 && !errors.quantity && (
-                  <p className="mt-1 text-sm text-gray-500">Available: {availableStock} units</p>
-                )}
               </div>
-
-              {/* Reference */}
-              <div>
-                <label htmlFor="reference" className="form-label">
-                  Reference (Optional)
-                </label>
-                <input
-                  type="text"
-                  id="reference"
-                  name="reference"
-                  value={transferData.reference}
-                  onChange={handleChange}
-                  className="form-input"
-                  placeholder="e.g., TRANSFER-20250226"
-                  disabled={isLoading || isProcessing}
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label htmlFor="notes" className="form-label">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  id="notes"
-                  name="notes"
-                  value={transferData.notes}
-                  onChange={handleChange}
-                  className="form-input"
-                  rows={2}
-                  placeholder="Additional information about this transfer"
-                  disabled={isLoading || isProcessing}
-                />
-              </div>
-
-              {/* Transfer Preview */}
-              {selectedItem && transferData.sourceLocationId && transferData.targetLocationId && (
-                <div className="bg-blue-50 p-3 rounded-md">
-                  <h4 className="text-sm font-medium text-blue-800 mb-2">Transfer Preview</h4>
-                  <p className="text-sm text-blue-800">
-                    Moving{' '}
-                    <span className="font-medium">
-                      {transferData.quantity}x {selectedItem.name}
-                    </span>{' '}
-                    from{' '}
-                    <span className="font-medium">
-                      {getLocationName(transferData.sourceLocationId)}
-                    </span>{' '}
-                    to{' '}
-                    <span className="font-medium">
-                      {getLocationName(transferData.targetLocationId)}
-                    </span>
-                  </p>
+            ) : !hasValidLocations ? (
+              <div className="px-6 py-12 text-center">
+                <div className="flex flex-col items-center justify-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="size-12 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  <p className="mt-4 text-gray-800 font-medium">Not enough locations available</p>
+                  <p className="text-gray-500">You need at least two locations to transfer stock</p>
+                  <button onClick={onClose} className="mt-6 btn btn-primary">
+                    Close
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                <div className="px-6 py-4 space-y-4">
+                  {/* Stock Item Selection */}
+                  <div>
+                    <label htmlFor="stockItemId" className="form-label">
+                      Stock Item
+                    </label>
+                    {stockItems.length === 0 ? (
+                      <div className="text-sm text-red-600 mt-1">
+                        No stock items available with quantity greater than 0
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          id="stockItemId"
+                          name="stockItemId"
+                          value={transferData.stockItemId}
+                          onChange={handleChange}
+                          className={`form-select ${errors.stockItemId ? 'border-red-300' : ''}`}
+                          disabled={isProcessing}
+                        >
+                          <option value="">Select an item</option>
+                          {stockItems.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} ({item.sku}) - {item.quantity} available
+                            </option>
+                          ))}
+                        </select>
+                        {errors.stockItemId && (
+                          <p className="mt-1 text-sm text-red-600">{errors.stockItemId}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-outline"
-                disabled={isProcessing}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={isProcessing || isLoading}
-                className="btn btn-primary"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="size-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                  {/* Source Location */}
+                  <div>
+                    <label htmlFor="sourceLocationId" className="form-label">
+                      From (Source Location)
+                    </label>
+                    <select
+                      id="sourceLocationId"
+                      name="sourceLocationId"
+                      value={transferData.sourceLocationId}
+                      onChange={handleChange}
+                      className={`form-select ${errors.sourceLocationId ? 'border-red-300' : ''}`}
+                      disabled={isProcessing || !!preselectedSourceId}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                      <option value="">Select source location</option>
+                      <optgroup label="Warehouses">
+                        {locations
+                          .filter((loc) => loc.type === 'WAREHOUSE')
+                          .map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                              {loc.name}
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Stores">
+                        {locations
+                          .filter((loc) => loc.type === 'STORE')
+                          .map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                              {loc.name}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                    {errors.sourceLocationId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.sourceLocationId}</p>
+                    )}
+                    {preselectedSourceId && (
+                      <p className="mt-1 text-sm text-blue-600">
+                        Using {getLocationName(preselectedSourceId)} as source
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Target Location */}
+                  <div>
+                    <label htmlFor="targetLocationId" className="form-label">
+                      To (Target Location)
+                    </label>
+                    <select
+                      id="targetLocationId"
+                      name="targetLocationId"
+                      value={transferData.targetLocationId}
+                      onChange={handleChange}
+                      className={`form-select ${errors.targetLocationId ? 'border-red-300' : ''}`}
+                      disabled={isProcessing}
+                    >
+                      <option value="">Select target location</option>
+                      <optgroup label="Stores">
+                        {locations
+                          .filter(
+                            (loc) =>
+                              loc.type === 'STORE' && loc.id !== transferData.sourceLocationId
+                          )
+                          .map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                              {loc.name}
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Warehouses">
+                        {locations
+                          .filter(
+                            (loc) =>
+                              loc.type === 'WAREHOUSE' && loc.id !== transferData.sourceLocationId
+                          )
+                          .map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                              {loc.name}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                    {errors.targetLocationId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.targetLocationId}</p>
+                    )}
+                  </div>
+
+                  {/* Quantity */}
+                  <div>
+                    <label htmlFor="quantity" className="form-label">
+                      Quantity to Transfer
+                    </label>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        id="quantity"
+                        name="quantity"
+                        value={transferData.quantity}
+                        onChange={handleChange}
+                        min="1"
+                        max={availableStock}
+                        className={`form-input ${errors.quantity ? 'border-red-300' : ''}`}
+                        disabled={isProcessing || !selectedItem}
                       />
-                    </svg>
-                    <span>Transfer Stock</span>
-                  </>
-                )}
-              </button>
-            </div>
+                      {availableStock > 0 && (
+                        <button
+                          type="button"
+                          className="ml-2 text-primary hover:text-primary-dark text-sm"
+                          onClick={() =>
+                            setTransferData((prev) => ({ ...prev, quantity: availableStock }))
+                          }
+                          disabled={isProcessing}
+                        >
+                          Max
+                        </button>
+                      )}
+                    </div>
+                    {errors.quantity && (
+                      <p className="mt-1 text-sm text-red-600">{errors.quantity}</p>
+                    )}
+                    {availableStock > 0 && !errors.quantity && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        Available: {availableStock} units
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Reference */}
+                  <div>
+                    <label htmlFor="reference" className="form-label">
+                      Reference (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      id="reference"
+                      name="reference"
+                      value={transferData.reference}
+                      onChange={handleChange}
+                      className="form-input"
+                      placeholder="e.g., TRANSFER-20250226"
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label htmlFor="notes" className="form-label">
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      id="notes"
+                      name="notes"
+                      value={transferData.notes}
+                      onChange={handleChange}
+                      className="form-input"
+                      rows={2}
+                      placeholder="Additional information about this transfer"
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  {/* Transfer Preview */}
+                  {selectedItem &&
+                    transferData.sourceLocationId &&
+                    transferData.targetLocationId && (
+                      <div className="bg-blue-50 p-3 rounded-md">
+                        <h4 className="text-sm font-medium text-blue-800 mb-2">Transfer Preview</h4>
+                        <p className="text-sm text-blue-800">
+                          Moving{' '}
+                          <span className="font-medium">
+                            {transferData.quantity}x {selectedItem.name}
+                          </span>{' '}
+                          from{' '}
+                          <span className="font-medium">
+                            {getLocationName(transferData.sourceLocationId)}
+                          </span>{' '}
+                          to{' '}
+                          <span className="font-medium">
+                            {getLocationName(transferData.targetLocationId)}
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="btn btn-outline"
+                    disabled={isProcessing}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirm}
+                    disabled={isProcessing || stockItems.length === 0}
+                    className="btn btn-primary"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="size-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                          />
+                        </svg>
+                        <span>Transfer Stock</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </motion.div>
         </div>
       </div>
